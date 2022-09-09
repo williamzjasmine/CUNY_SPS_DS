@@ -1,0 +1,316 @@
+---
+title: "Assignment 2 - SQL and R"
+author: "William Jasmine"
+date: "2022-09-08"
+output:
+  html_document: default
+  pdf_document: default
+params:
+  pw:
+    label: "Input password..."
+    value: ""
+    input: text
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Imports
+
+The chunk below includes all the pertinent R packages for running this .Rmd file.
+```{r, results='hide'}
+library("RMySQL")
+library("dplyr")
+```
+
+## Introduction
+This document outlines the process that was taken to create a SQL database using raw csv data, and then load that data into an R dataframe. The latter part of this document then provides some additional analysis/querying to show how to answer various questions about the data in both SQL and R. The data that was used comprises movie ratings of 10 different movies taken from 10 different individuals (100 total records).
+
+## Methodology
+### Data Collection 
+The first step in the process was to come up with a data collection method to easily retrieve and store the ratings that were provided by the participants. In this case, a [Google form](https://docs.google.com/forms/d/e/1FAIpQLSfWx8ubQ_kEnxnVeTKuDy34QrYGPdxnNC69zsryDrxRZrvZ-A/viewform?usp=sf_link) was used, given the application's simplicity in both creating a survey and collecting its results. The list below provides a summary of the questions and possible answers that were given on the survey:
+
+Question  | Possible Answers
+------------- | -------------
+Please enter your name  |  Open-ended (text)
+What is your gender?  |  Male, Female, Non-Binary, Other
+How old are you?  |  1-99
+What is your job title?  |  Open-ended (text)
+Rate the movie, "The Shining" on a scale of 1-5  |  1-5, I've never seen this movie
+Rate the movie, "It (2017)" on a scale of 1-5  |  1-5, I've never seen this movie
+Rate the movie, "Indiana Jones: Raiders of the Lost Ark" on a scale of 1-5  |  1-5, I've never seen this movie
+Rate the movie, "Avatar" on a scale of 1-5  |  1-5, I've never seen this movie
+Rate the movie, "Caddyshack" on a scale of 1-5  |  1-5, I've never seen this movie
+Rate the movie, "The Hangover" on a scale of 1-5  |  1-5, I've never seen this movie
+Rate the movie, "The Shawshank Redemption" on a scale of 1-5  |  1-5, I've never seen this movie
+Rate the movie, "The Social Network" on a scale of 1-5  |  1-5, I've never seen this movie
+Rate the movie, "Fahrenheit 9/11" on a scale of 1-5  |  1-5, I've never seen this movie
+Rate the movie, "Jiro Dreams of Sushi" on a scale of 1-5  |  1-5, I've never seen this movie
+
+
+The ten different movies that each participant will rate are shown above, and were chosen for a number of reasons: 
+
+* They are all "well-known" movies
+* They comprise a variety of genres (horror, action/adventure, comedy, drama, documentary)
+* They span a relatively large range of release years (1980-2017)
+
+Once the survey was created, it was sent out to 10 individuals and the results were recorded in Google Forms application. These individuals spanned a range of both genders and ages.
+
+### Data Cleaning
+The Google Forms application allows you to download the results of a Google Form as a csv file which takes the following format:
+
+Question 1 | Question 2 | Question 3 | ...
+------------- | ------------- | ------------- | -------------
+Participant 1 answer to Q1  | Participant 1 answer to Q2 | Participant 1 Answer to Q3 | ... 
+Participant 2 answer to Q1  | Participant 2 answer to Q2 | Participant 2 Answer to Q3 | ... 
+...  | ... | ... | ... 
+
+Additionally, all answers are stored as strings enclosed in double quote characters.
+While a helpful data collection tool, this formatting/structure is not the best for doing data analysis: the header comprises the actual questions, all the values are enclosed in strings, and it seems clunky (all of the data thrown together haphazardly into a single csv file). It would be beneficial to come up with some kind of architecture that would better suit the data, and allow for easier analysis. Thinking about this in terms of an SQL database, one option is to set up three different tables that would combine all the information present in this csv file into three different tables: 
+
+Table Name | Description | Fields
+------------- | ------------- | ------------- 
+respondents  | Contains all the personal information provided by each respondent | respondent_name, gender, age, job_title 
+movies  | Contains metadata pertaining to the movies used in the survey  | movie_name, genre, release_date
+ratings  | Contains the ratings provided by each respondent  | respondent_name, movie_name, rating
+
+Each of the field names provided above can be sourced from the initial csv file, with the exception of **release_date**, and **genre** which must be researched and inputted manually. One way to create these three tables is to clean the data so that we have three new csv files containing the required fields. To create these three files, the following python script was used: 
+
+```{python, eval=FALSE}
+filename_str = 'DATA_607-Assignment_2-Movie_Ratings_Survey.csv'
+
+ratings_list = []
+people_list = []
+movies_list = []
+
+with open(filename_str, 'r') as file_to_read:
+    lines = file_to_read.readlines()
+    for line in lines[1:]: # skip header w/ question titles
+        line_arr = line.split(',')
+        name = line_arr[0].replace('"', '')
+        gender = line_arr[1].replace('"', '')
+        age = line_arr[2].replace('"', '')
+        job = line_arr[3].replace('"', '')
+        shining_rating = line_arr[4].replace('"', '')
+        it_rating = line_arr[5].replace('"', '')
+        raiders_rating = line_arr[6].replace('"', '')
+        avatar_rating = line_arr[7].replace('"', '')
+        caddy_rating = line_arr[8].replace('"', '')
+        hangover_rating = line_arr[9].replace('"', '')
+        ssr_rating = line_arr[10].replace('"', '')
+        sn_rating = line_arr[11].replace('"', '')
+        f911_rating = line_arr[12].replace('"', '')
+        jdos_rating = line_arr[13].replace('"', '')
+        people_list.append([name, gender, age, job])
+        ratings_list.append([name, 'The Shining', shining_rating])
+        ratings_list.append([name, 'It (2017)', it_rating])
+        ratings_list.append([name, 'Indiana Jones: Raiders of the Lost Ark', raiders_rating])
+        ratings_list.append([name, 'Avatar', avatar_rating])
+        ratings_list.append([name, 'Caddyshack', caddy_rating])
+        ratings_list.append([name, 'The Hangover', hangover_rating])
+        ratings_list.append([name, 'The Shawshank Redemption', ssr_rating])
+        ratings_list.append([name, 'The Social Network', sn_rating])
+        ratings_list.append([name, 'Fahrenheit 9/11', f911_rating])
+        ratings_list.append([name, 'Jiro Dreams of Sushi', jdos_rating.replace('\n', '')])
+
+movies_list.append(['The Shining', 'Horror', '1980'])
+movies_list.append(['It (2017)', 'Horror', '2017'])
+movies_list.append(['Indiana Jones: Raiders of the Lost Ark', 'Action/Adventure', '1981'])
+movies_list.append(['Avatar', 'Action/Adventure', '2009'])
+movies_list.append(['Caddyshack', 'Comedy', '1980'])
+movies_list.append(['The Hangover', 'Comedy', '2009'])
+movies_list.append(['The Shawshank Redemption', 'Drama', '1994'])
+movies_list.append(['The Social Network', 'Drama', '2010'])
+movies_list.append(['Fahrenheit 9/11', 'Documentary', '2004'])
+movies_list.append(['Jiro Dreams of Sushi', 'Documentary', '2011'])
+
+movies_data = []
+people_data = []
+rating_data = []
+for row in movies_list:
+    movies_data.append(",".join(row)+ '\n')
+
+for row in ratings_list:
+    rating_data.append(",".join(row) + '\n')
+
+for row in people_list:
+    people_data.append(",".join(row)+ '\n')
+
+with open('respondents.csv', 'w') as file_to_write:
+    file_to_write.writelines(people_data)
+
+with open('movies.csv', 'w') as file_to_write:
+    file_to_write.writelines(movies_data)
+
+with open('ratings.csv', 'w') as file_to_write:
+    file_to_write.writelines(rating_data)
+```
+
+The script above accomplishes a number of data cleaning steps:
+
+* Removes the header of the initial csv file (containing all the questions), 
+* removes the double quotes around each value,
+* parses the file to find the information that will populate the **ratings** and **respondents** tables,
+* manually inputs the information needed to populate the **movies** table (information pulled from IMDB),
+* outputs three different csv files: respondents.csv, movies.csv, ratings.csv, each corresponding to the data we want contained in our three SQL tables. 
+
+### Creating the SQL Database
+
+The next step is to use an SQL script to turn the previously created csv files into actual SQL tables, thus creating a complete database. In this case, MySQL was used and before running any SQL scripts a schema named **movie_survey** was created in the MySQL Workbench GUI. Instructions for creating a new schema can be found [here](https://docs.rapidminer.com/9.0/server/installation/creating_mysql_db.html#:~:text=Right%2Dclick%20on%20the%20list,command%20that%20creates%20the%20schema).
+
+Once a schema has been created to load the data into, the following SQL script can be used to create the **movies**, **respondents**, and **ratings** tables:
+
+```{SQL, eval=FALSE}
+/*
+  movie_survey.sql
+*/
+
+#################################################################################################
+/* Load movies.csv file */
+
+DROP TABLE IF EXISTS movies;
+
+CREATE TABLE movies 
+(
+  movie_name varchar(100) NOT NULL,
+  genre varchar(100) NOT NULL,
+  release_year int NOT NULL
+);
+
+LOAD DATA INFILE '/Users/williamjasmine/repos/CUNY_SPS_DS/DATA_607/Homeworks/HW2/movies.csv' 
+INTO TABLE movies
+FIELDS TERMINATED BY ',' 
+LINES TERMINATED BY '\n'
+(movie_name, genre, release_year);
+
+
+################################################################################################
+/* Load respondents.csv file */
+
+DROP TABLE IF EXISTS respondents;
+
+CREATE TABLE respondents
+(
+  respondent_name varchar(100) NOT NULL,
+  gender varchar(100) NOT NULL,
+  age int NOT NULL,
+  job_title varchar(100) NOT NULL
+);
+
+LOAD DATA INFILE '/Users/williamjasmine/repos/CUNY_SPS_DS/DATA_607/Homeworks/HW2/respondents.csv' 
+INTO TABLE respondents
+FIELDS TERMINATED BY ',' 
+LINES TERMINATED BY '\n'
+(respondent_name, gender, age, job_title);
+
+
+################################################################################################
+/* Load ratings.csv file */
+
+DROP TABLE IF EXISTS ratings;
+
+CREATE TABLE ratings 
+(
+  respondent_name varchar(100) NOT NULL,
+  movie_name varchar(100) NOT NULL,
+  rating int NULL
+);
+
+LOAD DATA INFILE '/Users/williamjasmine/repos/CUNY_SPS_DS/DATA_607/Homeworks/HW2/ratings.csv' 
+INTO TABLE ratings
+FIELDS TERMINATED BY ',' 
+LINES TERMINATED BY '\n'
+(respondent_name, movie_name, @rating)
+SET
+rating = nullif(@rating, "I've never seen this movie.")
+;
+```
+
+The above script creates the **movies**, **respondents**, and **ratings** table and inserts them into the **movie_survey** schema. The script includes specifics about the data types of the fields in each table, but the field names are the same as those in the table from the previous subsection. The sctipt also carries out one last data cleaning step: because "I've never seen this movie" was a possible answer when rating the movies, the script searches for any time this string occurs and inputs those values as null. As such, the **rating** column can be cast as an integer field.
+
+### Loading Data Into R
+
+Now that the data from the survey exists in a MySQL database, it can be loaded directly into R. The following R chunk uses the *RMySQL* package to connect to the database. The password has been hidden using R markdown parameters.  
+```{r}
+mydb <- dbConnect(MySQL(), user='williamjasmine', dbname='movie_survey', password=params$pw)
+```
+
+Now that there's a connection to the database, the *dbGetQuery()* function can be used to get the results from actual SQL queries and store them as R dataframes. The following code chunk uses queries to select all data from the **movies**, **ratings**, and **respondents** tables. 
+```{r}
+movies_df <- dbGetQuery(mydb, 'SELECT * FROM movies')
+respondents_df <- dbGetQuery(mydb, 'SELECT * FROM respondents')
+ratings_df <- dbGetQuery(mydb, 'SELECT * FROM ratings')
+```
+
+Next, the *glimpse()* function can be used to get some information about each of the data frames, and ensure they are loaded correctly. 
+```{r}
+glimpse(movies_df)
+glimpse(respondents_df)
+glimpse(ratings_df)
+```
+
+Based on the above results, it is clear that all the data has been loaded correctly into R: **movies_df** contains ten movies, **respondents_df** contains ten people, and **ratings_df** contains one hundred ratings. 
+
+## Some Analysis
+
+Now that we have our data in R, we can use it to answer some questions...
+
+### What is the Highest and Lowest Rated Movie?
+In R:
+```{r}
+ratings_df %>% 
+  filter(!is.na(rating)) %>%
+    group_by(movie_name) %>% 
+      summarise(avg_score = mean(rating)) %>%
+        arrange(desc(avg_score))
+```
+In SQL:
+```{r}
+query <- "
+SELECT
+  movie_name,
+  AVG(rating) as average_rating
+FROM ratings
+GROUP BY movie_name
+ORDER BY 2 DESC
+"
+results_df <- dbGetQuery(mydb, query)
+results_df
+```
+We see that both the R and SQL results are the same: The Shawshank Redemption was the most highy rated movie, while "The Shining" was the lowest rated movie.
+
+### Which movie was the most popular for people under 50?
+In R:
+```{r}
+ratings_df %>%
+  left_join(respondents_df, by="respondent_name") %>%
+      filter(!is.na(rating) & age < 50) %>%
+        group_by(movie_name) %>% 
+          summarise(avg_score = mean(rating)) %>%
+            arrange(desc(avg_score)) %>%
+              slice(which.max(avg_score))
+```
+In SQL:
+```{r}
+query <- "
+SELECT
+	movie_name,
+    AVG(rating) as avg_rating
+FROM ratings 
+LEFT JOIN respondents
+USING (respondent_name)
+WHERE age < 50
+GROUP BY 1
+ORDER BY 2 DESC
+LIMIT 1
+"
+results_df <- dbGetQuery(mydb, query)
+results_df
+```
+
+The above results confirm in both R and SQL that for people under 50, the top rated movie is "The Hangover."
+
+## Conclusion
+The above steps outlined the entire process of generating a database from a set of survey questions, loading that data as R data frames, and giving a glimpse into how analysis might be done to answer some simple questions. While there are definitely parts of this process that could be simplified (or automated), these scripts and code can be rerun as people continue to fill out the Google Form and can be updated if necessary. 
