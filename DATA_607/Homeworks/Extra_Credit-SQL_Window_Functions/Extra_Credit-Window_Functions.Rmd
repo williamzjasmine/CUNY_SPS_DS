@@ -1,0 +1,57 @@
+---
+title: "Data 607 - Extra Credit - Window Functions"
+author: "William Jasmine"
+date: "2022-09-14"
+output:
+  html_document: default
+  pdf_document: default
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(openintro)
+options(gsubfn.engine = "R")
+library(sqldf)
+```
+
+The chunk below downloads the time series data from the "OpenIntro" package. More specifically, the data imported below is from the `sp500_1950_2018` dataset and includes daily financial metrics for the S&P 500 market for all trading days from 1950-2018. 
+```{r}
+data(sp500_1950_2018)
+```
+
+The query below demonstrates how to calculate both the the year-to-date average and the six-day moving averages for the opening and high daily price of the S&P 500 market. For simplicity's sake, the only data used for this analysis was those observations between 2018-01-01 and 2018-12-31.
+
+```{r}
+query <- "
+WITH prep_data AS (
+  SELECT
+    *,
+    CEIL((row_num - 1) / 6) + 1 as week
+  FROM (
+    SELECT
+      *,
+      ROW_NUMBER() OVER(ORDER BY date) as row_num
+    FROM sp500_1950_2018 
+    WHERE 
+      date BETWEEN '2018-01-01' AND '2018-12-31'
+    ORDER BY date
+  )
+)
+
+SELECT
+  date,
+  open,
+  high,
+  AVG(open) OVER(ORDER BY date) as open_YTD_avg,
+  AVG(high) OVER(ORDER BY date) as high_YTD_avg,
+  AVG(open) OVER(PARTITION BY week ORDER BY week) as open_6_day_rolling_avg,
+  AVG(high) OVER(PARTITION BY week ORDER BY week) as high_6_day_rolling_avg
+FROM prep_data
+WHERE 
+  date BETWEEN '2018-01-01' AND '2018-12-31'
+ORDER BY 1 
+"
+df <- sqldf(query)
+head(df)
+```
+The `prep_data` CTE above shows how to use the `ROW_NUMBER` function to determine which 6-day "week" the observation falls into, and then the following query uses the CTE and window functions to determine the YTD and 6-day rolling average of both the opening and high daily price of of the S&P 500 stock index. 
