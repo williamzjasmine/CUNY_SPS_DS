@@ -885,6 +885,161 @@ be simplified (or automated), these scripts and code can be rerun as
 people continue to fill out the Google Form and can be updated if
 necessary.</p>
 </div>
+<div id="extra-credit---global-baseline-estimate" class="section level2">
+<h2>Extra Credit - Global Baseline Estimate</h2>
+<p><strong>Problem Description:</strong> Most recommender systems use
+personalized algorithms like “content management” and “item-item
+collaborative filtering.” Sometimes non-personalized recommenders are
+also useful or necessary. One of the best non-personalized recommender
+system algorithms is the “Global Baseline Estimate.</p>
+<p>The job here is to use the survey data collected and write the R code
+that makes a movie recommendation using the Global Baseline Estimate
+algorithm.</p>
+<p><strong>Solution:</strong></p>
+<p>First, find the respondents who have unrated items:</p>
+<pre class="r"><code>ratings_df %&gt;%
+  group_by(respondent_name) %&gt;% 
+    summarise(num_unrated_movies = sum(is.na(rating))) %&gt;%
+       arrange(desc(num_unrated_movies))</code></pre>
+<pre><code>## # A tibble: 10 × 2
+##    respondent_name num_unrated_movies
+##    &lt;chr&gt;                        &lt;int&gt;
+##  1 Teal                             5
+##  2 Max                              4
+##  3 Theodore                         4
+##  4 Donna                            3
+##  5 Jarobi                           2
+##  6 Michelle                         2
+##  7 Jay                              1
+##  8 Maha                             0
+##  9 Rob                              0
+## 10 William                          0</code></pre>
+<p>According to the output above, Teal has the most unrated items. These
+unrated items are outputted by the R chunk below:</p>
+<pre class="r"><code>ratings_df %&gt;%
+  filter(is.na(rating) == TRUE &amp; respondent_name == &quot;Teal&quot;) %&gt;%
+    pull(var = &#39;movie_name&#39;)</code></pre>
+<pre><code>## [1] &quot;The Shining&quot;          &quot;It (2017)&quot;            &quot;Caddyshack&quot;          
+## [4] &quot;Fahrenheit 9/11&quot;      &quot;Jiro Dreams of Sushi&quot;</code></pre>
+<p>The above five movies were unrated by Teal, one of which can be
+randomly chosen to provide a recommendation for. In this case, “The
+Shining” will be used.</p>
+<p>Creating a movie recommendation using the Global Baseline Estimate
+requires both the average rating for each movie, and the average rating
+provided by each user. The former is calculated below and stored as a
+dataframe called <code>avg_movie_ratings</code>:</p>
+<pre class="r"><code>avg_movie_ratings &lt;- 
+  ratings_df %&gt;% 
+    filter(!is.na(rating)) %&gt;%
+      group_by(movie_name) %&gt;% 
+        summarise(avg_rating = mean(rating)) %&gt;%
+          arrange(desc(avg_rating))
+avg_movie_ratings</code></pre>
+<pre><code>## # A tibble: 10 × 2
+##    movie_name                             avg_rating
+##    &lt;chr&gt;                                       &lt;dbl&gt;
+##  1 The Shawshank Redemption                     4.11
+##  2 The Hangover                                 4   
+##  3 Indiana Jones: Raiders of the Lost Ark       3.8 
+##  4 Fahrenheit 9/11                              3.78
+##  5 Jiro Dreams of Sushi                         3.67
+##  6 The Social Network                           3.5 
+##  7 Caddyshack                                   3.33
+##  8 It (2017)                                    3.25
+##  9 Avatar                                       3.22
+## 10 The Shining                                  2.88</code></pre>
+<p>The chunk below calculates the average rating provided by each user
+and stores it as a dataframe called <code>avg_user_rating</code>:</p>
+<pre class="r"><code>avg_user_ratings &lt;- 
+  ratings_df %&gt;% 
+    filter(!is.na(rating)) %&gt;%
+      group_by(respondent_name) %&gt;% 
+        summarise(avg_rating = mean(rating)) %&gt;%
+          arrange(desc(avg_rating))
+avg_user_ratings</code></pre>
+<pre><code>## # A tibble: 10 × 2
+##    respondent_name avg_rating
+##    &lt;chr&gt;                &lt;dbl&gt;
+##  1 Rob                   4.3 
+##  2 Theodore              4.17
+##  3 William               4.1 
+##  4 Max                   4   
+##  5 Michelle              3.5 
+##  6 Donna                 3.43
+##  7 Jarobi                3.38
+##  8 Jay                   3.22
+##  9 Teal                  3.2 
+## 10 Maha                  2.7</code></pre>
+<p>The next step is to calculate the average movie rating provided by
+all users for all movies. This is done in the code chunk below, and the
+value is stored in variable called <code>total_avg_rating</code>:</p>
+<pre class="r"><code>total_avg_rating &lt;-
+  ratings_df %&gt;%
+    filter(is.na(rating) == FALSE) %&gt;%
+      pull(var=&#39;rating&#39;) %&gt;%
+        mean()
+total_avg_rating</code></pre>
+<pre><code>## [1] 3.594937</code></pre>
+<p>Next, the difference between both the user and movie ratings averages
+and the <code>total_avg_rating</code> is calculated. This is done in the
+cell below, by adding a <code>mean_diff</code> column to both the
+<code>avg_user_ratings</code> and <code>avg_movie_ratings</code>
+dataframes.</p>
+<pre class="r"><code>avg_user_ratings &lt;-
+  avg_user_ratings %&gt;% 
+    mutate(mean_diff = avg_rating - total_avg_rating)
+
+avg_movie_ratings &lt;- 
+  avg_movie_ratings %&gt;% 
+    mutate(mean_diff = avg_rating - total_avg_rating)
+
+glimpse(avg_user_ratings)</code></pre>
+<pre><code>## Rows: 10
+## Columns: 3
+## $ respondent_name &lt;chr&gt; &quot;Rob&quot;, &quot;Theodore&quot;, &quot;William&quot;, &quot;Max&quot;, &quot;Michelle&quot;, &quot;Donn…
+## $ avg_rating      &lt;dbl&gt; 4.300000, 4.166667, 4.100000, 4.000000, 3.500000, 3.42…
+## $ mean_diff       &lt;dbl&gt; 0.70506329, 0.57172996, 0.50506329, 0.40506329, -0.094…</code></pre>
+<pre class="r"><code>glimpse(avg_movie_ratings)</code></pre>
+<pre><code>## Rows: 10
+## Columns: 3
+## $ movie_name &lt;chr&gt; &quot;The Shawshank Redemption&quot;, &quot;The Hangover&quot;, &quot;Indiana Jones:…
+## $ avg_rating &lt;dbl&gt; 4.111111, 4.000000, 3.800000, 3.777778, 3.666667, 3.500000,…
+## $ mean_diff  &lt;dbl&gt; 0.51617440, 0.40506329, 0.20506329, 0.18284107, 0.07172996,…</code></pre>
+<p>All the components to determine a recommendation via a Global
+Baseline Estimate have now been determined, and all that remains is the
+final calculation.</p>
+<p>To provide a user <code>x</code> a recommendation for movie
+<code>y</code>, we can define <span class="math inline">\(\mu_x\)</span>
+and <span class="math inline">\(\mu_y\)</span> as the average user and
+movie ratings, respectively. To calculate the Global Baseline Estimate
+<span class="math inline">\(GBE\)</span> we can then use the following
+equation:</p>
+<p><span class="math display">\[GBE=\mu+(\mu_x-\mu)+(\mu_y-\mu)\]</span>
+where <span class="math inline">\(\mu\)</span> is the average movie
+rating across all movies and users (<code>total_avg_rating</code> in
+this case). The following code cell translates the above equation into R
+for our example, in which <code>x=The Shining</code> and
+<code>y=Teal</code>:</p>
+<pre class="r"><code>movie = &#39;The Shining&#39;
+user = &#39;Teal&#39;
+
+# first_term
+total_avg_rating +
+
+# second term
+avg_movie_ratings %&gt;% 
+  filter(movie_name == movie) %&gt;%
+    pull(var = mean_diff) +
+
+# third term  
+avg_user_ratings %&gt;% 
+  filter(respondent_name == user) %&gt;%
+    pull(var = mean_diff)</code></pre>
+<pre><code>## [1] 2.480063</code></pre>
+<p>Based off the results of the output above, a recommender system
+implementing a Global Baseline Estimate methodology would predict Teal’s
+rating for the <code>The Shining</code> to be ~ 2.48.</p>
+</div>
 
 
 
