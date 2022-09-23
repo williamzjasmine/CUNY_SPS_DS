@@ -1,8 +1,10 @@
 ---
-title: "Data_607 - Project 1 - Data Cleaning"
+title: "Data 607 - Project 1 - Data Cleaning"
 author: "William Jasmine"
 date: "2022-09-21"
-output: html_document
+output:
+  html_document: default
+  pdf_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -123,7 +125,6 @@ The red cells indicate the times in which desired values are saved to various ve
 
 ```{r}
 final_df = cbind.data.frame(names, pair_nums, states, points, ratings)
-print(points)
 colnames(final_df) <- c('player_name', 'pair_number', 
                         'state', 'points_won', 'pre_rating')
 colnames(matches_df) <- c('player_name', 'pair_number')
