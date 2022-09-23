@@ -1,0 +1,118 @@
+---
+title: "Data_607 - Project 1 - Data Analysis"
+author: "William Jasmine"
+date: "2022-09-21"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r, include=FALSE}
+
+# Imports
+library("RCurl")
+library("dplyr")
+library("ggplot2")
+library("tidyverse") 
+```
+
+## Import Data from CSV
+
+```{r}
+fileName <- 'tournamentinfo.txt'
+file_lines <- paste(readLines(fileName))
+print(file_lines[1:5])
+```
+
+```{r}
+file_lines = file_lines[-1:-4]
+file_lines[1:5]
+```
+
+## Parse File
+
+```{r}
+matches_df <- data.frame(matrix(ncol = 2, nrow = 0))
+names = c()
+pair_nums = c()
+states = c()
+points = c()
+ratings = c()
+
+for (line_num in 1:length(file_lines)){
+  if (line_num %% 3 == 0){
+    next
+  }
+  else {
+    line_arr <- strsplit(file_lines[line_num], "|", fixed = TRUE)
+    #print(line_arr)
+    if (line_num %% 3 == 1) {
+      pair_num <- as.integer(
+        gsub(line_arr[[1]][1], pattern = " ", replacement = ""))
+      name <- str_extract(line_arr[[1]][2], '[A-Z].*[A-Z]')
+      points_won =  as.integer(
+        gsub(line_arr[[1]][3], pattern = " ", replacement = ""))
+      opponent_pair_nums = c()
+      for (col_num in 4:10){
+        opponent_pair_num = str_extract(line_arr[[1]][col_num],
+                                        '([1-9][1-9])|[1-9]')
+        if (is.na(opponent_pair_num) == FALSE) {
+          opponent_pair_nums = append(as.integer(opponent_pair_num),
+                                      opponent_pair_nums)
+        }
+      }
+      player_name = rep(name, length(opponent_pair_nums))
+      tmp = cbind.data.frame(player_name, opponent_pair_nums)
+      matches_df = rbind(matches_df, tmp)
+      pair_nums = append(pair_nums, pair_num)
+      names = append(names, name)
+      points = append(points, points_won)
+    }
+    else if (line_num %% 3 == 2) {
+      state <- gsub(line_arr[[1]][1], pattern = " ", replacement = "")
+      pre_rating <- as.integer(
+          gsub(gsub(str_extract(line_arr[[1]][2], ' \\d{3,4}(( )|P)'), 
+               pattern=" ", replacement=''), pattern='P', replacement=''))
+      states = append(states, state)
+      ratings = append(ratings, pre_rating)
+    }
+    else {
+      print('Something went wrong')
+    }
+  }
+  
+}
+
+final_df = cbind.data.frame(names, pair_nums, states, points, ratings)
+print(points)
+colnames(final_df) <- c('player_name', 'pair_number', 
+                        'state', 'points_won', 'pre_rating')
+colnames(matches_df) <- c('player_name', 'pair_number')
+ 
+head(final_df)
+```
+
+## Calc Average Ratings 
+
+```{r}
+avg_opponent_score_df <- 
+  matches_df %>%
+    left_join(final_df, by = "pair_number", suffix=c("", "_y")) %>%
+      group_by(player_name) %>%
+        summarise(avg_opponent_score=mean(pre_rating))
+```
+
+## Putting it All Together
+
+```{r}
+final_df <- 
+  final_df %>%
+    left_join(avg_opponent_score_df, by='player_name')
+
+final_df <- final_df[-2]
+final_df
+
+```
