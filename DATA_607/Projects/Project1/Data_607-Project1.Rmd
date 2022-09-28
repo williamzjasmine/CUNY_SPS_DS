@@ -3,8 +3,8 @@ title: "Data 607 - Project 1 - Data Cleaning"
 author: "William Jasmine"
 date: "2022-09-21"
 output:
-  html_document: default
   pdf_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -86,7 +86,7 @@ for (line_num in 1:length(file_lines)){
       opponent_pair_nums = c()
       for (col_num in 4:10){ # (6)
         opponent_pair_num = str_extract(line_arr[[1]][col_num],
-                                        '([1-9][1-9])|[1-9]') # (7)
+                                        '([1-9][0-9])|[0-9]') # (7)
         if (is.na(opponent_pair_num) == FALSE) { # (7)
           opponent_pair_nums = append(as.integer(opponent_pair_num),
                                       opponent_pair_nums) # (8)
