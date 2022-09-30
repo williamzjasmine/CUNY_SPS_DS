@@ -1,0 +1,180 @@
+---
+title: "Data 607 - Assignment 4 - Tidying and Transforming Data"
+author: "William Jasmine"
+date: "2022-09-27"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r, include=FALSE}
+
+# Imports
+library("RCurl")
+library("dplyr")
+library("tidyverse") 
+library("stringr")
+```
+
+## Introduction
+
+The goal of this assignment is to take some messy (untidy) airport arrival data, clean it, and then analyze it. The hope is that doing so will elucidate a number of insights regarding the arrival patterns of two different airlines. 
+
+## Import Data
+
+The data is stored in a csv file [here](https://raw.githubusercontent.com/williamzjasmine/CUNY_SPS_DS/master/DATA_607/Homeworks/HW4/dirty_airport_data.csv), and is imported as a R data frame in the chunk below:
+
+```{r}
+
+raw_data <- getURL('https://raw.githubusercontent.com/williamzjasmine/CUNY_SPS_DS/master/DATA_607/Homeworks/HW4/dirty_airport_data.csv')
+
+# File was tab delimited, hence the sep = "\t" option 
+df <- data.frame(read.csv(text=raw_data, sep = "\t"))
+df
+```
+
+The output above reveals that the data in its current format has a number of issues to be addressed: 
+
+1. The first two columns were unnamed, and thus the import function gave them the generic `X` and `X.1` labels. 
+2. The third row only contains missing data (both `NA` values and empty strings).
+3. The airline name is missing in two of the cells where it looks like it should be populated (rows 2 and 5, column `X`).
+4. The data is in a wide format: 
+- The names of the cities should not be their own columns but rather condensed into a single column.
+- Once the categorical variables all have their own column, the values in the cells can also be condensed into a single column. 
+5. Once the city names become values in a single column, the `.` characters in their names need to be replaced by a space character. Though the `.` was not present in the city names in the original csv file, they were added during the import to prevent there being spaces in the dataframe column names. 
+
+The following section works to fix each of the above issues in order.
+
+## Tidy Data 
+
+The cell below reaplces the column names `X` and `X.1` with what they should actually be: `airline` and `arrival_status`:
+
+```{r}
+colnames(df)[1] <- "airline"
+colnames(df)[2] <- "arrival_status"
+df
+```
+
+As shown in the output above, these first two columns now have appropriate names.
+
+The code chunk below uses the `drop_na()` function to remove the third row entirely, since it contains no useful information:
+
+```{r}
+df <- drop_na(df)
+df
+```
+
+As is shown in the output above, the once third row containing only empty and `NA` values is no longer present in the dataframe. 
+
+The code below fills in the empty values in the `airline` column using the `fill()` function. This function fills a `NA` cell with the value of the column immediately above it, which in this case exactly what this dataframe needs. However, to use the function those two empty values are first converted to `NA`. 
+
+```{r}
+df[df==""]<-NA
+df <- fill(df, airline)
+df
+```
+
+As shown in the output above, the missing `airline` values are now included in the dataframe. 
+
+Now that there is no missing data, the next step is to transform the dataframe into a long format. This can be easily done using the `pivot_longer()` function, and specifying in the `names_to` column that the city name columns are to be melted into a single field called `city`. The values in the cells are then also melted into a single field called `frequency`.  
+
+```{r}
+df <- pivot_longer(df, cols = !c(airline, arrival_status), 
+                   names_to = 'city', values_to = 'frequency')
+head(df)
+```
+
+The `head()` of the dataframe above shows that it has been successfully converted into a long format. 
+
+The last step is to replace the `.` characters in each of the city names with spaces. This is done easily with the `str_replace_all()` function: 
+
+```{r}
+df$city <- str_replace_all(df$city, "\\.", " ")
+df
+```
+
+And that's it! The data is now in the desired form: no missing data, and long as opposed to wide. 
+
+## Analyze Data
+
+Now that the data has been cleaned, it can be analyzed. The following code chunk uses a combination of `dplyr` functions to determine the percentage of flights that had late or timely arrivals for each airline:
+
+
+```{r}
+airline_df <-
+  df %>% 
+    group_by(airline) %>%
+      summarise(
+        num_flights = sum(frequency),
+        num_delays = sum(ifelse(arrival_status=='delayed', frequency, 0))
+      )
+
+airline_df <- 
+  airline_df %>%
+    mutate(
+        num_on_time = num_flights - num_delays,
+        delay_rate = num_delays / num_flights,
+        on_time_rate = (num_flights - num_delays) / num_flights
+    ) %>%
+      arrange(delay_rate)
+airline_df
+```
+
+It looks like that while AM WEST (American West Airlines) has more arrival delays in total, they actually had a slightly better `delay_rate` than ALASKA (Alaska Airlines) by a little over two percentage points: in other words, flights from AM WEST arrived on time for a higher percentage of their flights. 
+
+The following cell performs the same analysis, except now aggregates the information on a city level:
+
+```{r}
+city_df <-
+  df %>% 
+    group_by(city) %>%
+      summarise(
+        num_flights = sum(frequency),
+        num_delays = sum(ifelse(arrival_status=='delayed', frequency, 0))
+      )
+
+city_df <- 
+  city_df %>%
+    mutate(
+        num_on_time = num_flights - num_delays,
+        delay_rate = num_delays / num_flights,
+        on_time_rate = (num_flights - num_delays) / num_flights
+    ) %>% 
+      arrange(delay_rate)
+
+city_df
+```
+
+Looking at the `delay_rates` for individual cities, its clear theres actually a pretty big range. Phoenix was the easiest city to get to for both airlines, with about 92% of their flights arriving on time. However, San Francisco seemed to pose some trouble, as only 78% of flights made it there without delay. The following cell zooms in on both of these cities's flight info: 
+
+```{r}
+df %>% 
+  filter(city == 'San Francisco' | city == 'Phoenix') %>%
+    group_by(city, airline) %>%
+      summarise(
+        num_flights = sum(frequency),
+        num_delays = sum(ifelse(arrival_status=='delayed', frequency, 0))
+      ) %>%
+        mutate(
+          num_on_time = num_flights - num_delays,
+          delay_rate = num_delays / num_flights,
+          on_time_rate = (num_flights - num_delays) / num_flights
+        ) %>%
+          arrange(city, airline)
+
+```
+The information above shows that while both airlines had pretty close `on_time_rate`s for Phoenix, AM WEST seems more to blame for San Franciso's overall `delay_rate`: only 71% of AM WEST's flights to San Francisco arrived on time, compared to 83% of flights flown by ALASKA. Given that San Francisco is part of the American West, you might assume that AM WEST could do better, but maybe that's why they went out of business...
+
+## Output Data
+
+The final step is to output the data so that anyone can build upon the analysis done here. This is done in the chunk below: 
+
+```{r}
+write.csv(df,"clean_airport_data.csv")
+```
+

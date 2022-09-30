@@ -323,7 +323,7 @@ for (x in 1:100){
   sim <- sample(shot_outcomes,  size=num_shots, replace=TRUE,
                  prob = c(shot_pct, 1-shot_pct))
   streak <- openintro::calc_streak(sim)
-  all_streaks <-rbind(all_streaks, streak)
+  all_streaks <- rbind(all_streaks, streak)
 }
 
 print(prop.table(table(all_streaks)))
