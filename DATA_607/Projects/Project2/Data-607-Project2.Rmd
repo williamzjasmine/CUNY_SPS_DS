@@ -1,0 +1,424 @@
+---
+title: "Data 607 - Project 1 - Data Cleaning"
+author: "William Jasmine"
+date: "2022-09-21"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r, include=FALSE}
+
+# Imports
+library("RCurl")
+library("dplyr")
+library("ggplot2")
+library("tidyverse") 
+library('openintro')
+library("png")
+```
+
+```{r, include=FALSE}
+# Ben Ingbar: GDP Data
+# Jhalak Das: student_data
+```
+
+# Introduction
+
+This project includes work done to tidy three "messy" data sets that originated as CSV files. The sections below outline the steps required to clean these data sets, and then analyzes each of the resulting "clean" data frames to answer a specific research question. The three `.csv` files used, as well as a description of the data they include can be found below: 
+
+1. `unclean_GDP_data.csv`: Includes the GDP of most world countries from 1961-2021. [Source](https//www.kaggle.com/datasets/prashant808/global-gdp-dataset-2021?resource=download) (Provided in class discussion by Benjamin Ingbar)
+
+2. `unclean_student_data.csv`: Includes the test results for a class of students over the course of three different school terms. [Source](https://gist.github.com/Kimmirikwa/b69d0ea134820ea52f8481991ffae93e#file-student_results-csv) (Provided in class discussion by Jhalak Das)
+
+3. `unclean_atmosphere_data.csv`: Includes a number of measurements (i.e.  pressure) regarding the air in our atmosphere at various heights above sea level. [Source](https://kwstat.github.io/untidydata2/articles/hypoxia.html) (Provided in class discussion by Neil Hodgkinson)
+
+The data is also stored in the following [Github location](https://github.com/williamzjasmine/CUNY_SPS_DS/tree/master/DATA_607/Projects/Project2/unclean_data).
+
+# Import Data
+
+The following cells import each of the `.csv` files listed above from the specified github location. 
+
+```{r}
+csv_data = getURL("https://raw.githubusercontent.com/williamzjasmine/CUNY_SPS_DS/master/DATA_607/Projects/Project2/unclean_data/unclean_GDP_data.csv")
+gdp_df = read.csv(text = csv_data)
+head(gdp_df)
+```
+```{r}
+csv_data = getURL("https://raw.githubusercontent.com/williamzjasmine/CUNY_SPS_DS/master/DATA_607/Projects/Project2/unclean_data/unclean_student_data.csv")
+
+student_df = read.csv(text = csv_data)
+head(student_df)
+```
+
+```{r}
+csv_data = getURL("https://raw.githubusercontent.com/williamzjasmine/CUNY_SPS_DS/master/DATA_607/Projects/Project2/unclean_data/unclean_atmosphere_data.csv")
+
+atmos_df = read.csv(text = csv_data)
+head(atmos_df)
+```
+
+Looking above, it is clear that each of the `.csv` files were successfully imported, and the `head` of each is printed above. The three files have now been turned into three R dataframes: `gdp_df`, `student_df`, and `atmos_df`. The following sections will separately clean and analyze each of these dataframes. 
+
+# GDP Dataset
+## Cleaning the Data
+
+The first step is to clean the column names so that its easier to access the required data for each subsequent cleaning step. The column names have a number of issues, which are listed below along with how they can be fixed:
+
+1. The year columns all start with a `X.` This can be fixed by using a `str_replace_all`.
+2. The categorical variable columns all have `.` characters (which replaced the spaces in the original `.csv` file). This can be fixed by using a `str_replace_all`.
+3. The first column name `ï..Country.Name` has a special character and can be fixed by just renaming the column completely to `country_name`.
+4. The column names include capital letters, which can be fixed using the `tolower()` function. 
+
+Each of these fixes is performed in the code chunk below, and the commented numbers correspond to the where each of the above steps is performed.
+
+```{r}
+new_col_names <- 
+  colnames(gdp_df) %>% #1 
+    str_replace_all("X", '') %>% #2 
+      str_replace_all('\\.', '_') %>% #3
+        tolower() #4 
+new_col_names[1] <- 'country_name'
+
+colnames(gdp_df) <- new_col_names
+head(gdp_df, 1)
+```
+
+As is clear in the output above, the column names are all fixed.
+
+Next step is to convert the numerous year columns into a single field (as opposed to each year having its own column). Completing this step means that the data will be in a more desirable long format, and can be easily accomplished using the `pivot_longer` function. This is done in the code chunk below: 
+
+```{r}
+cols_to_keep <- c('country_name', 'country_code', 'indicator_name', 'indicator_code')
+gdp_df <- pivot_longer(gdp_df, 
+                   cols = !all_of(cols_to_keep), 
+                   names_to = 'year', 
+                   values_to = 'gdp')
+head(gdp_df)
+```
+
+The `pivot_longer` specifies in the `names_to` column that the year columns are to be melted into a single field called `year`. The values in the cells are then also melted into a single field called `gdp`.
+
+While the data now has the desired structure, it is clear from the output that there are a number of `NA` entries, representing years in which the GDP was not recorded for a given country. While it might make sense to replace these `NA` values with a string like `"not recorded"`, we are unable to do so since that would mean two different datatypes would be stored in the same column, which is not possible. 
+
+There is however one last data cleaning step that is possible: the cells below print the unique values present in both the `indicator_name` and `indicator_code` columns:
+
+```{r}
+print(unique(gdp_df$indicator_name))
+print(unique(gdp_df$indicator_code))
+
+```
+
+As it is clear in the output above, each of the columns only one value, telling us that all of the measurements are GDP values measured in US dollars. Since all the measurements in the `gdp` column are of the same type and unit, these columns provide no additional information. As such, they are removed in the cell below. 
+
+```{r}
+gdp_df <- 
+  gdp_df %>% select(country_name, country_code, year, gdp)
+head(gdp_df)
+```
+The data frame above is now in its final form, and is ready to be analyzed. 
+
+## Analysis 
+
+One possible research question we can now answer with the cleaned data is to determine the global trend in GDP year over year (both as total dollar amount and percent change). 
+
+The first step in doing so is to aggregate the global GDP by year for all countries. This is done below using a `groupby` and `summarise` function:
+
+```{r}
+global_gdp_df <-
+  gdp_df %>%
+    filter(!is.na(gdp)) %>% 
+      group_by(year) %>%
+        summarise(global_gdp = sum(gdp))
+head(global_gdp_df)
+```
+The output above shows the newly created`global_gdp_df` dataframe, which contains the global GDP each year in USD. The cell below adds to that dataframe the percent change in global GDP using the `lag` window function: 
+
+```{r}
+global_gdp_df <- 
+  global_gdp_df %>%
+    mutate(percent_change = (global_gdp - lag(global_gdp)) / lag(global_gdp))
+head(global_gdp_df)
+```
+The code cell below checks to make sure that the calculation done above is correct but finding the percent change in global GDP from 1960 to 1961 and comparing it to the analogous `percent_change` value in the dataframe: 
+
+```{r}
+tmp = global_gdp_df$global_gdp 
+(tmp[2] - tmp[1]) / tmp[1] == global_gdp_df$percent_change[2]
+
+```
+
+The `TRUE` output above means that the percent change calculation worked correctly and that these values can now be plotted: 
+
+```{r}
+ggplot(data = global_gdp_df) +
+  geom_line(mapping = aes(x = year, y = global_gdp, group=1)) +
+  labs(
+    x = "Year",
+    y = 'Global GDP ($)',
+    title = "Total Global GDP From 1960 - 2021",
+  ) +
+  scale_x_discrete(breaks=seq(1960, 2020, 5)) +
+  theme(axis.text.x = element_text(angle = 90)) 
+```
+```{r}
+ggplot(data = global_gdp_df) +
+  geom_line(mapping = aes(x = year, y = percent_change * 100, group=1)) +
+  labs(
+    x = "Year",
+    y = 'Yearly Change in Global GDP (%)',
+    title = "Year Over Year Percent Change in GDP From 1961-2021 GDP",
+  ) +
+  scale_x_discrete(breaks=seq(1960, 2020, 5)) +
+  theme(axis.text.x = element_text(angle = 90)) 
+```  
+  
+In the above plots, we can make pinpoint the location of important global economic events. Most recently, we see the dips in global GDP (both value and percentage) in 2009 and 2020, due to the 2008 recession and Covid-19, respectively. 
+
+# Student Dataset
+## Data Cleaning
+
+The first step in cleaning the `student_df` dataframe is, once again, to clean the column names. For this dataframe, the only issue with the column names is that they contain `.` characters. The are removed below using the `str_replace_all` function. 
+
+```{r}
+new_col_names <- 
+  colnames(student_df) %>% 
+    str_replace_all("\\.", '_')
+
+colnames(student_df) <- new_col_names
+head(student_df, 1)
+```
+
+The next data cleaning steps are to:
+
+1. Transform the `sex_and_age` column into two separate columns, one containing the student's gender, and the other containing their age. 
+2. Remove the word "test" from the values in the `test_number` field, given that we already know the numbers correspond to different tests thanks to the column name.
+
+Both of these steps are completed below using a single `mutate` in tandem with the `str_extract` function:
+
+```{r}
+student_df <-
+  student_df %>%
+    mutate(gender = str_extract(sex_and_age, '(m|f)'),
+           age = str_extract(sex_and_age, '\\d\\d'),
+           test_no = strtoi(str_extract(test_number, '\\d'))) %>%
+      select(-sex_and_age, -test_number)
+
+head(student_df)
+```
+
+The final step in this case, is to use the `pivot_longer` function to melt the "term" fields into a single column. This is done in the code chunk below:
+
+```{r}
+cols_to_melt <- c('term_1', 'term_2', 'term_3')
+student_df <- pivot_longer(student_df, 
+                   cols = all_of(cols_to_melt), 
+                   names_to = 'term', 
+                   values_to = 'test_score')
+head(student_df)
+
+```
+Like with the original `test_number` column, we can remove the extraneous word "term" from the values in the `term` column: 
+
+```{r}
+student_df$term <- str_extract(student_df$term, '\\d')
+head(student_df)
+```
+The output represents the final dataframe, which is now ready to be analyzed.
+
+## Analysis
+
+Given that the cleaned `student_df` dataframe contains information regarding students test scores for a number of different school terms, an interesting research task might be to check the normality of the distribution of the student's final letter grades after each term. 
+
+To do this, we first need to figure out each student's average test score after each term. This is done below using a `group_by` and `summarise` function: 
+
+```{r}
+avg_test_scores <-
+  student_df %>%
+    group_by(name, term) %>%
+      summarise(avg_test_score = mean(test_score))
+head(avg_test_scores)
+```
+
+The following code uses an `if` statement to categorize the student's final grades as letter grades:
+
+```{r}
+avg_test_scores <- 
+  avg_test_scores %>%
+    mutate(
+    letter_grade = 
+      ifelse(avg_test_score >= 90, 'A',
+      ifelse(avg_test_score >= 80, 'B',
+      ifelse(avg_test_score >= 70, 'C',
+      ifelse(avg_test_score >= 65, 'D', 
+      'F')))),
+    hist_grade = 
+      ifelse(avg_test_score >= 90, 2,
+      ifelse(avg_test_score >= 80, 1,
+      ifelse(avg_test_score >= 70, 0,
+      ifelse(avg_test_score >= 65, -1, 
+      -2))))
+    )
+
+table(avg_test_scores$letter_grade)
+```
+
+The output above prints the distributions of letter grades from all students after each term, but in order to get a better idea of whether or not the data is normal it is plotted below along with a normal distribution:
+
+```{r}
+ggplot(data = avg_test_scores, aes(x = hist_grade)) +
+  geom_blank() +
+  geom_histogram(aes(y = ..density..), bins=5) +
+  stat_function(fun = dnorm,
+                args = c(mean = mean(avg_test_scores$hist_grade),
+                         sd = sd(avg_test_scores$hist_grade)), 
+                col = "green") +  
+  labs(
+    x = "Letter Grade (-2=F, -1=D, 0=C, 1=B, 2=A)",
+    title = "Histogram of Student Letter Grades After Each Term",
+  ) 
+
+
+```
+Because a histogram requires numeric values to generate the bins, the %x% label defines the scale that was used to produce the graphic. These values were stored in the `hist_grade` column of the `avg_test_scores` dataframe, and it was the mean and standard deviation of this column that was used to create the normal curve seen in green. A quick visual analysis of this graphic does show that the data appears normal, but this assumption could definitely be made made more clear if we had more data. 
+
+# Atmosphere Dataset
+## Cleaning Data
+
+The cell below gives another look at the unclean `atmoshpere_df` dataframe:
+
+```{r}
+head(atmos_df)
+```
+
+The first step in this case is to remove the extraneous `X` index column of the dataframe, as R automatically indexes rows of a datafrmae itself. This is done in the cell below:
+
+```{r}
+atmos_df <- atmos_df %>%
+  select(-X)
+head(atmos_df)
+```
+
+Our next step is to once again clean the column names of the `atmos_df` dataframe. There are a number of cleaning steps that need to be performed, each of which is listed below:
+
+1. Remove the `X` characters from the column names. 
+2. Remove the `.` characters in front of the column names.
+3. Replace the `.` characters inside the column names with `_` characters.
+
+Each of these steps is performed below, and is labeled via a comment in the code: 
+
+```{r}
+new_col_names <-
+  colnames(atmos_df) %>%
+    str_replace_all('X', "") %>% #1
+      str_replace_all('^\\.*', '') %>% #2 
+        str_replace_all('\\.', '_') %>% #3
+          tolower()
+
+colnames(atmos_df) <- new_col_names
+head(atmos_df)
+
+```
+The next data cleaning step involves removing the first row of the dataframe: inspecting this row in the output above reveals that this row just contains notes on what the measurements are in each column. Because it doesn't have any measurements itself, it should be removed. However, in order for the information in the row to still be accessible, it is saved in the `field_info` dataframe before it is deleted from `atmos_df`.  
+
+```{r}
+field_info <- atmos_df[1,]
+atmos_df <- atmos_df[-1,]
+rownames(atmos_df) <- NULL
+head(atmos_df)
+```
+
+The next step is to clean the altitude column, as this represents the single "categorical" variable we will use for the final dataframe. Upon inspection of the values in this column, there are a number of data cleaning steps that need to be performed:
+
+1. The "Sea Level" value should be replaced with 0. 
+2. The feet and meter measurements need to be separated into their own separate columns. 
+3. Each value needs to be multiplied by 1,000, as indicated by the `k` characters.
+
+Steps 2 and 3 are performed below using a `mutate` in tandem with a combination of `str_extract` and `str_replace` functions.
+
+```{r}
+atmos_df <-
+  atmos_df %>%
+    mutate(
+        altitude_ft = strtoi(str_extract(altitude, '\\d\\d')) * 1000,
+        altitude_m = str_extract(altitude, '\\/(\\d\\d?\\.?\\d?k)') %>%
+          str_replace('k', '') %>%
+            str_replace('\\/', '') %>%
+              as.numeric() * 1000
+    )
+
+atmos_df <- 
+  cbind(
+    select(atmos_df, altitude_ft, altitude_m), 
+    select(atmos_df, -altitude_ft, -altitude_m)
+  )
+head(atmos_df)
+```
+We can see now that the `altitude_ft` and `altitude_m` fields have been created, and that they are now numeric fields as opposed to a single character field. Finally, the cell below uses the `replace_na` function to fill the single `NA` value in these columns with 0 (sea level elevation). It also removes the old `altitude` column, as it is no longer required.
+
+```{r}
+atmos_df$altitude_ft <- replace_na(atmos_df$altitude_ft, 0)
+atmos_df$altitude_m <-replace_na(atmos_df$altitude_m, 0)
+atmos_df <- select(atmos_df, -altitude)
+
+atmos_df
+```
+The next step is to change the data types of the remaining character columns, as they are all actually numerical measurement values. While all the values seen above are technically integers, the types of measurements being taken are taken on a continuous scale. As such, these fields are all converted to a numeric type so that any future measurements that might be added will be able to have decimal point values. 
+
+```{r}
+atmos_df <-atmos_df %>% 
+  mutate_if(is.character, as.numeric) %>%
+    mutate_if(is.integer, as.numeric)
+head(atmos_df)
+```
+Now that all the measurement columns have been converted to numeric fields, we can complete the final data cleaning step: converting the dataframe into a long format. In this case, the altitude values represent our "categorical" fields, as each atmospheric measurement was taken at every one of the included heights. The remaining measurement fields are then all melted into a single `measurement_type` field, with the actual measurements being stored in a `measurement` column. This is done below using the `pivot_longer` function:
+
+```{r}
+atmos_df <- 
+  pivot_longer(atmos_df, cols = !c(altitude_ft, altitude_m),
+               names_to = 'measurement_type', values_to = 'measurement')
+
+head(atmos_df)
+```
+
+The output above represents our final dataframe. The benefit of having the data in this format is that now different measurements can now be easily added as rows. This includes measurements of fields that already exist in the `measurement_type` column, but it is also easy to add a completely new measurement type without having to create a completely new field. 
+
+
+## Analysis 
+
+One interesting research question for this data might be to see the correlation between air pressure and the air pressure due to oxygen (`ppo2` in the dataframe) as we go higher and higher up into the sky. To do this, we can look at a scatter plot of this data. First, the cell below gathers the required information:
+
+```{r}
+plt_df <-
+  atmos_df %>%
+      filter(measurement_type == 'air_press' | measurement_type == 'ppo2') %>%
+        pivot_wider(names_from = measurement_type, values_from = measurement)
+
+head(plt_df)
+```
+Next, the cell below plots air pressure as a function of oxygen concentration: 
+
+```{r}
+ggplot(plt_df, aes(x=ppo2, y=air_press, color = altitude_ft)) + 
+  geom_point() +   
+  geom_smooth(method = "lm", se = FALSE, size=0.25, color='black') + 
+  labs(
+    x = "Air Pressure (mmHg)",
+    y = "Oxygen Concentration (ppm)",
+    title = "Oxygen Correlation vs. Air Pressure At Varying Heights",
+  ) + 
+  annotate("text",x=100,y=620,
+           label=(paste0("slope==",coef(lm(plt_df$ppo2~plt_df$air_press))[2])),
+           parse=TRUE)
+```
+
+It is clear in the plot above that there is an almost perfect correlation between the total air pressure and the air pressure due to oxygen as altitude increases. The fact that they are so perfectly correlated indicates that the concentration of oxygen does not change as altitude increases, which is consistent with what we know about our atmosphere. This also means that the slope of the line (which represents oxygen air pressure divided by total air pressure) should give the concentration of oxygen in our atmosphere. This is confirmed by the fact that the slope of the line is about 0.21, which is almost the exact proportion of oxygen atoms in our atmosphere.  
+
+# Conclusion 
+
+The work done above gives three examples of how unclean data sets can be tidied in order to answer hypothetical research questions. While the specifics involved in cleaning and analyzing each data set were different, it is important to note that many of the steps were similar, and the process in general is pretty much the same. These examples help to highlight that data cleaning is an essential part of any data science process.
