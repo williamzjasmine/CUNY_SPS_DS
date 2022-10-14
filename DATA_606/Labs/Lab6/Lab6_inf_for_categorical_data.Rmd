@@ -1,6 +1,6 @@
 ---
 title: "Inference for categorical data"
-author: ""
+author: "William Jasmine"
 output:
   pdf_document: default
   html_document:

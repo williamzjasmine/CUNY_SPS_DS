@@ -9,6 +9,7 @@
 <meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
 
 
+<meta name="author" content="William Jasmine" />
 
 
 <title>Inference for categorical data</title>
@@ -1650,7 +1651,7 @@ div.tocify {
 
 
 <h1 class="title toc-ignore">Inference for categorical data</h1>
-<h4 class="author"></h4>
+<h4 class="author">William Jasmine</h4>
 
 </div>
 
@@ -2051,6 +2052,9 @@ week. The null and alternative hypotheses for this test is written
 below:</p>
 <p><span class="math inline">\(H_o\)</span>: <span class="math inline">\(p_1 - p_2 = 0\)</span></p>
 <p><span class="math inline">\(H_A\)</span>: <span class="math inline">\(p_1 - p_2 \neq 0\)</span></p>
+<p>The hypothesis test is carried out below using 95% confidence
+intervals (<span class="math inline">\(\alpha = 0.05\)</span>) on
+bootstrap samples of the test statistic (<span class="math inline">\(p_1-p_2\)</span>):</p>
 <div class="sourceCode" id="cb24"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(seed)</span>
 <span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a>yrbss <span class="sc">%&gt;%</span></span>
@@ -2126,7 +2130,7 @@ probability that you could detect a change (at a significance level of
 <p>The question asked here can be simply boiled down to: what is the
 chance of getting a false positive result (type 1 error)? In this case,
 a false positive means that we detect a statistical difference between
-of the proportion of students who strength train 7 days a week when
+the proportion of students who strength train 7 days a week when
 comparing the populations of those who sleep 10+ hours a day and those
 who don’t, even when there isn’t a difference in actuality. Fortunately,
 the significance level used is exactly the incidence that we might
@@ -2155,12 +2159,12 @@ terms of <span class="math inline">\(n\)</span>:</p>
 <p><span class="math inline">\(n =
 \frac{{z^*}^2p(1-p)}{ME^2}\)</span></p>
 <p>This equation can now be used to determine the sample size given to
-reach any margin of error, given that the probability is not known. In
-this case, since the probability is not known, we can use <span class="math inline">\(p\)</span> = 0.5, since it is the value at which
-the margin of error is at a maximum (the worse case scenario). Thus,
-using <span class="math inline">\(p\)</span> = 0.5 ensures that the
-formula will generate an <span class="math inline">\(n\)</span> that
-will be less than or equal to the desired margin of error. The <span class="math inline">\(n\)</span> required for a 1% margin of error is
+reach any margin of error, given that the probability is known. In this
+case, since the probability is not known, we can use <span class="math inline">\(p\)</span> = 0.5 as it is the value at which the
+margin of error is at a maximum (the worse case scenario). Thus, using
+<span class="math inline">\(p\)</span> = 0.5 ensures that the formula
+will generate an <span class="math inline">\(n\)</span> that will be
+less than or equal to the desired margin of error. The <span class="math inline">\(n\)</span> required for a 1% margin of error is
 calculated below:</p>
 <div class="sourceCode" id="cb28"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a>moe <span class="ot">&lt;-</span> <span class="fl">0.01</span></span>
 <span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a>z <span class="ot">&lt;-</span> <span class="fl">1.96</span></span>
