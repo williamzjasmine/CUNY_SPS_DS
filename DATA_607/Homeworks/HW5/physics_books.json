@@ -1,0 +1,51 @@
+{
+    "Book Details": {
+        "Book": [
+            {
+                "Title": "Introduction to Quantum Mechanics",
+                "Author": "David J. Griffiths",
+                "Publication Info": {
+                    "company": "Pearson Prentice Hall",
+                    "year": "2005",
+                    "location": "Upper Saddle River, New Jersey, 07468"
+                },
+                "Amazon Info": {
+                    "price": "$61.28",
+                    "rating": "4.6",
+                    "num_reviews": "1,225",
+                    "link": "https://www.amazon.com/Introduction-Quantum-Mechanics-David-Griffiths/dp/1107189632"
+                }
+            },
+            {
+                "Title": "A First Course In String Theory",
+                "Author": "Barton Zwieback",
+                "Publication Info": {
+                    "company": "Cambridge University Press",
+                    "year": "2009",
+                    "location": "New York, New York, 10006"
+                },
+                "Amazon Info": {
+                    "price": "$70.99",
+                    "rating": "4.6",
+                    "num_reviews": "86",
+                    "link": "https://www.amazon.com/First-Course-String-Theory-2nd/dp/0521880327"
+                }
+            },
+            {
+                "Title": "Cold Molecules: Theory, Experiment, Applications",
+                "Author": "Roman V. Krems",
+                "Publication Info": {
+                    "company": "CRC Press",
+                    "year": "2009",
+                    "location": "Boca Raton, Florida, 33487"
+                },
+                "Amazon Info": {
+                    "price": "$49.99",
+                    "rating": "N/A",
+                    "num_reviews": "0",
+                    "link": "https://www.amazon.com/Cold-Molecules-Theory-Experiment-Applications/dp/1420059033"
+                }
+            }
+        ]
+    }
+}

@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Book_Details>
+  <Book>
+    <Title>Introduction to Quantum Mechanics</Title>
+    <Author>David J. Griffiths</Author>
+    <Publication_Info>
+      <company>Pearson Prentice Hall</company>
+      <year>2005</year>
+      <location>Upper Saddle River, New Jersey, 07468</location>
+    </Publication_Info>
+    <Amazon_Info>
+      <price>$61.28</price>
+      <rating>4.6</rating>
+      <num_reviews>1,225</num_reviews>
+      <link>https://www.amazon.com/Introduction-Quantum-Mechanics-David-Griffiths/dp/1107189632</link>
+    </Amazon_Info>
+  </Book>
+  <Book>
+    <Title>A First Course In String Theory</Title>
+    <Author>Barton Zwieback</Author>
+    <Publication_Info>
+      <company>Cambridge University Press</company>
+      <year>2009</year>
+      <location>New York, New York, 10006</location>
+    </Publication_Info>
+    <Amazon_Info>
+      <price>$70.99</price>
+      <rating>4.6</rating>
+      <num_reviews>86</num_reviews>
+      <link>https://www.amazon.com/First-Course-String-Theory-2nd/dp/0521880327</link>
+    </Amazon_Info>
+  </Book>
+  <Book>
+    <Title>Cold Molecules: Theory, Experiment, Applications</Title>
+    <Author>Roman V. Krems</Author>
+    <Publication_Info>
+      <company>CRC Press</company>
+      <year>2009</year>
+      <location>Boca Raton, Florida, 33487</location>
+    </Publication_Info>
+    <Amazon_Info>
+      <price>$49.99</price>
+      <rating>N/A</rating>
+      <num_reviews>0</num_reviews>
+      <link>https://www.amazon.com/Cold-Molecules-Theory-Experiment-Applications/dp/1420059033</link>
+    </Amazon_Info>
+  </Book>
+</Book_Details>
