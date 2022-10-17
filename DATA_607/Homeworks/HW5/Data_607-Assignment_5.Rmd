@@ -1,0 +1,141 @@
+---
+title: "Data 607 - Assignment 5 - Working with Document File Formats"
+author: "William Jasmine"
+date: "2022-09-21"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r, include=FALSE}
+# Imports
+library("RCurl")
+library("dplyr")
+library("ggplot2")
+library("tidyverse") 
+library("png")
+library("rjson")
+library("readr")
+library("XML")
+```
+
+
+# Introduction 
+
+This assignment involves creating three different document files of different type (`.xml`, `.html`, and `.xml`), and loading them into R dataframes. As such, the following three files were created by hand: `physics_books.html`, `physics_books.xml`, and `physics_books.json`. They each contain the same information (details regarding three physics textbooks), the only difference being that each of them uses their own specific file format. The following code goes through the process of loading and cleaning each of these files into tidy R dataframes. Each of the files can be found [on Github](https://github.com/williamzjasmine/CUNY_SPS_DS/tree/master/DATA_607/Homeworks/HW5).
+
+# HTML File
+# Ingesting File
+
+The easiest file to load and clean is likely the `.html` file, since HTML gives a user the ability to store data in tables that when published to websites very much resemble R dataframes. The `XML` package has a function called `readHTMLTable` that makes the transition from HTML table to R dataframe pretty seamless. It is implemented below: 
+
+```{r}
+html_str <- read_file('https://raw.githubusercontent.com/williamzjasmine/CUNY_SPS_DS/master/DATA_607/Homeworks/HW5/physics_books.html')
+html_df <- readHTMLTable(html_str)
+html_df <- html_df[[1]]
+glimpse(html_df)
+```
+
+As can be seen above, `html_df` is now and R dataframe that contains all of the HTML table data. 
+
+## Cleaning the Data
+
+The first step that we can take in cleaning this data is renaming some of the column names, as their current format is slightly "clunky" to work with. 
+
+```{r}
+new_col_names <- colnames(html_df) %>%
+  tolower() %>%
+    str_replace_all("publication_info.", 'publisher_') %>% 
+      str_replace_all("amazon_info.", 'amazon_')
+
+colnames(html_df) <- new_col_names
+glimpse(html_df)
+```
+
+The next step is to convert all the quantitative columns fields into actual numerical fields, as they are all currently character fields. The methodology is a bit different for each one given the data cleaning they require, but the following cell converts the `publisher_year`, `amazon_price`, `amazon_rating`, and `amazon_num_reviews` field into numerical fields:
+
+```{r}
+html_df$amazon_price <- html_df$amazon_price %>%
+  str_replace_all("\\$", '')
+
+html_df$amazon_num_reviews <- html_df$amazon_num_reviews %>%
+  str_replace_all(",", '')
+
+html_df$amazon_rating <- html_df$amazon_rating %>%
+  na_if("N/A")
+
+html_df <- html_df %>%
+  mutate(
+    publisher_year = as.integer(publisher_year),
+    amazon_price = as.numeric(amazon_price),
+    amazon_num_reviews = as.integer(amazon_num_reviews),
+    amazon_rating = as.numeric(amazon_rating)
+  )
+
+glimpse(html_df)
+```
+
+Now that all the columns are of the correct type, the last data cleaning step is to split the `publisher_location` column into three new columns, `publisher_city`, `publisher_state`, `publisher_zip`. This is done in the cell below:
+
+```{r}
+
+html_df <- html_df %>%
+  mutate(
+    publisher_city = str_extract(publisher_location, '^(.+?),'),
+    publisher_state = str_extract(publisher_location, ',(.+?),'),
+    publisher_zip = str_extract(publisher_location, ',( \\d{5})')
+  ) %>%
+    select(!publisher_location)
+
+html_df$publisher_city <- html_df$publisher_city %>%
+  str_replace_all(",", '')
+
+html_df$publisher_state <- html_df$publisher_state %>%
+  str_replace_all(",", '')
+
+html_df$publisher_zip <- html_df$publisher_zip %>%
+  str_replace_all(', ', '')
+
+glimpse(html_df)
+
+```
+
+The data above is in its final clean state, and is ready to be analyzed.
+
+# XML File
+
+The next file to read in is the XML file. This can be done using the `XML` package's `xmlToDataFrame` function 
+
+```{r}
+xml_str <- read_file('https://raw.githubusercontent.com/williamzjasmine/CUNY_SPS_DS/master/DATA_607/Homeworks/HW5/physics_books.xml')
+xml_df <- xmlToDataFrame(xml_str, collectNames = TRUE)
+glimpse(xml_df)
+```
+
+As can be seen in the output above, this file format is slightly harder to ingest, seeing as the nested "Publication_Info" and "Amazon_Info" columns we not parsed and separated into their individual columns.
+
+# JSON File
+
+The last file to be ingested is the JSON file, which is done below using the `fromJSON` function. 
+
+```{r}
+json_str <- read_file("https://raw.githubusercontent.com/williamzjasmine/CUNY_SPS_DS/master/DATA_607/Homeworks/HW5/physics_books.json")
+
+json_nested <- fromJSON(json_str)
+json_unlisted <- 
+  lapply(json_nested, function(x) {
+    x[sapply(x, is.null)] <- NA
+    unlist(x)
+  })
+
+json_df <- as.data.frame(do.call("cbind", json_unlisted))
+
+json_df
+```
+
+This file is probably the most complex to be parsed, given the structure of the JSON format. However, via use of the `sapply` and `unlist` functions above, the data is transformed so that it can be restructured into a usable R dataframe.
