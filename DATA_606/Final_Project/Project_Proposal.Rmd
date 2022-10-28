@@ -1,0 +1,130 @@
+---
+title: "DATA 606 Data Project Proposal"
+author: "William Jasmine"
+output: pdf_document
+---
+
+```{r, include=FALSE}
+library('RCurl')
+library('tidyverse')
+```
+
+### Data Preparation
+
+The data I will be using for this project comes from Kaggle, and contains data pertaining to about 22k proton-proton collisions that were observed in CERN's large hadron collider (LHC) while it was running in 2010. The data is stored on [Github](https://github.com/williamzjasmine/CUNY_SPS_DS/blob/master/DATA_606/Final_Project/MultiJetRun2010B.csv), and loaded in the cell below: 
+
+
+```{r setup, echo=TRUE, results='hide', warning=FALSE, message=FALSE}
+# load data
+link <- getURL("https://raw.githubusercontent.com/williamzjasmine/CUNY_SPS_DS/master/DATA_606/Final_Project/MultiJetRun2010B.csv")
+df <- read_csv(link, na=c("", "NA"))
+```
+
+
+### Research question 
+
+In 2010 when these collisions took place, the Higgs Boson particle existed only as part of theoretical physics models. In 2012, its existence was famously proven experimentally thanks to the work of the thousands of physicists working at the CERN laboratory. One of the ways that they were able to prove its existence was by analyzing the "b-jets" created after particle collisions. A jet in particle physics refers to the similarly directed stream of particles that follow a quark or gluon that has flown off on its own as the result of a particle collision. Essentially, smashing two subatomic particles (protons, in this case) results in sending the elementary components of those particles (quarks, in this case) off in different directions. Thanks to quantum mechanics, these ultra-fast flying quarks pull new quarks and gluon pairs out of the surrounding vacuum and sends those particles flying in roughly the same direction, creating what looks like a jet of particles. b-jets are those jets that originate from a type of quark known as a bottom quark. b-jets were of particular interest to the scientists are CERN due to the fact that there are a number of larger particles that end up decaying into bottom quarks. In 2010 the Higgs Boson was hypothesized to be one of these larger particles, hence the reason they are counted and included as their own column in this data set `nBjets`. 
+
+As such, we can use this data set to answer the research question: *what are the conditions required for a particle collision to result in a b jet?*
+
+Though we do now do know that this Higgs Boson exists, there are still a number of other hypothesized particles that have similar decay patterns resulting in bottom quarks. As such, there is still relevance in asking this research question.
+
+### Cases 
+
+**What are the cases, and how many are there?**
+
+```{r}
+nrow(df)
+```
+
+As shown in the output above, there are 21,726 cases (particle collions) in this data set. 
+
+### Data collection 
+
+**Describe the method of data collection.**
+
+This data was collected in the CERN laboratory using a myriad of advanced detectors and digital sensors. The [CERN website](https://www.home.cern/science/experiments/how-detector-works) offers much greater detail into how these tools work to capture information about particle collisions.
+
+### Type of study 
+
+**What type of study is this (observational/experiment)?**
+
+This is an observational study.
+
+### Data Source 
+
+**If you collected the data, state self-collected. If not, provide a citation/link.**
+
+The link to the data can be found on [Kaggle](https://www.kaggle.com/datasets/fedesoriano/multijet-primary-dataset) but also directly from the [CERN website](http://opendata.cern.ch/record/554).
+
+
+### Dependent Variable
+
+**What is the response variable? Is it quantitative or qualitative?**
+
+The response variable in this case is the number of b-jets created by the particle collision, stored in the data set as `nBjets`. It is a quantitative, continuous variable. 
+
+### Independent Variable(s)
+
+The table below includes a list of the independent variables, as well as their descriptions:
+
+Column Name  | Description
+------------- | -------------
+MR | First razor kinematic variable, the MR variable is an estimate of an overall mass scale, which in the limit of massless decay products equals the mass of the heavy parent particle.
+Rsq | Second razor kinematic variable, the Rsq variable is the square of the ratio R, which quantifies the flow of energy in the plane perpendicular to the beam and the partitioning of momentum between visible and invisible particles.
+E1 | Energy of the leading megajet.
+Px1 | x-component of the momentum of the leading megajet.
+Py1 | y-component of the momentum of the leading megajet.
+Pz1 | z-component of the momentum of the leading megajet.
+E2 | Energy of the subleading megajet.
+Px2 | x-component of the momentum of the subleading megajet.
+Py2 | y-component of the momentum of the subleading megajet.
+Pz2 | z-component of the momentum of the subleading megajet.
+HT | The scalar sum of the transverse momentum of the jets.
+MET | The magnitude of the vector sum of the transverse energy of the particles in the event.
+
+
+### Relevant summary statistics 
+
+**Provide summary statistics for each the variables. Also include appropriate visualizations related to your research question (e.g. scatter plot, boxplots, etc). This step requires the use of R, hence a code chunk is provided below. Insert more code chunks as needed.**
+
+The following cell uses the summary function to get some of the descriptive statistics for all variables:
+
+```{r}
+summary(df)
+```
+
+
+The histogram below gives the distribution of the number of b-jets formed from collisions:
+
+```{r}
+ggplot(data = df, aes(x = nBJets)) +
+  geom_histogram()
+```
+
+Given the small number of collisions that actually do result in b-jets and the fact that even fewer have more than 1 b-jet, it might be better to instead create a new dependent, categorical variable `bjets` such that:
+
+* `bjets = TRUE` if the collision did result in a b-jet.
+* `bjets = FALSE` if the collision did not result in a b-jet.
+
+This new variable is created below: 
+
+```{r}
+df <- df %>%
+  mutate(bjets = ifelse(nBJets > 0, TRUE, FALSE))
+
+table(df$bjets)
+```
+
+The output above gives the specifics concerning the number of collisions that result in b-jets, and those that do not. 
+
+```{r}
+n = nrow(df)
+p = unname(table(df$bjets))[2] / n
+
+n * p >= 10
+n * (1 - p) >= 10
+
+```
+
+The output above proves that if $p$ is the probability of those collisions that resulted in a b-jet then $np$ and $n(1-p)$ are each greater than 10, a requirement to conduct inference on a categorical variable. 
