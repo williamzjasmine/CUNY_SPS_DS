@@ -1,0 +1,297 @@
+---
+title: "Data 607 - Project 4 - Document Classification"
+author: "William Jasmine"
+date: "2022-11-17"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include=FALSE}
+# Set seed so results are reproducible
+seed <- 1234
+
+# Imports needed to run the .Rmd file.
+library("RCurl")
+library("tidyverse") 
+library("tm")
+library("naivebayes")
+library("ROCR")
+library("wordcloud")
+library("caret")
+```
+
+# Introduction 
+
+This document will outline the process by which a Naive Bayes classifier can be used to categorize documents as spam or ham (not spam). The data being used in this case comes from [Kaggle](https://www.kaggle.com/datasets/uciml/sms-spam-collection-dataset) and consists of a set of 5,574 SMS text messages. The Kaggle dataset page lists the source of the text messages, all of which are listed below: 
+
+* A collection of 425 SMS spam messages extracted from the [http://co.uk-www.com/grumbletext.co.uk](Grumbletext Web site). This is a UK forum in which cell phone users make public claims about SMS spam messages.
+
+* A subset of 3,375 SMS randomly chosen ham messages of the [NUS SMS Corpus (NSC)](https://scholarbank.nus.edu.sg/handle/10635/137343), which is a dataset of about 10,000 legitimate messages collected for research at the Department of Computer Science at the National University of Singapore. 
+
+* A list of 450 SMS ham messages collected from [Caroline Tag's PhD Thesis](https://etheses.bham.ac.uk/id/eprint/253/1/Tagg09PhD.pdf).
+
+* [The SMS Spam Corpus v.0.1 Big](https://www.esp.uem.es/jmgomez/smsspamcorpus). It contains 1,002 SMS ham messages and 322 spam messages.
+
+The data set has also been loaded to [Github page](https://github.com/williamzjasmine/CUNY_SPS_DS/blob/master/DATA_607/Projects/Project4/spam.csv) for this project. 
+
+The goal in this case is to build a classifier that can accurately determine which of the text messages in our data set are spam. 
+
+# Data Import
+
+The cell below imports the data from Github and loads it into the R dataframe, `texts`:
+
+```{r, warning=FALSE}
+link <- getURL('https://raw.githubusercontent.com/williamzjasmine/CUNY_SPS_DS/master/DATA_607/Projects/Project4/spam.csv')
+texts <- read_csv(link)
+glimpse(texts)
+```
+
+We see from the output above that the data consists of 5 columns and the expected 5,572 texts. The first and second columns (`v1` and `v2`) appear to contain the relevant information, namely the category (spam/ham) and content of the text, respectively. 
+
+# Data Preparation
+## Cleaning The `texts` Dataframe
+
+The last three columns in the data (`...3`, `...4`, and `..5`) appear to not contain any useful information, but the cell below checks to make sure by printing out any instances in which those columns contain non `NA` values: 
+
+```{r}
+texts %>% filter(!is.na(...3) | !is.na(...4) | !is.na(...5)) %>%
+  select(...3, ...4, ...5)
+```
+
+There only exist 50 rows in which these columns are not empty, and from a quick glance it appears that they add no additional information. As such, they can be removed. This is performed in the cell below along with a number of other data cleaning steps (described in the comments):
+
+```{r}
+# remove ...3, ...4, and ...5 columns
+texts <- texts %>% 
+  select(v1, v2)
+
+# give appropriate names to the remaining two columns
+colnames(texts) <- c('category', 'text')
+
+# transform spam --> 1 and ham --> 0
+texts <- texts %>%
+  mutate(category = ifelse(category == 'spam', 1, 0))
+
+# add a text_id field so every text has a unique identifier
+texts$text_id <- 1:nrow(texts)
+
+head(texts)
+```
+
+We see from the output above that our new `texts` dataframe now has the following fields:
+
+* `category`: 0 if the text is not spam, 1 if it is.
+* `text`: the content of the text message
+* `text_id`: A unique integer identifier for each text message. 
+
+The cell below checks to make sure that both the `category` and `text` fields contain no `NA` or empty values:
+
+```{r}
+texts %>% 
+  filter(
+    is.na(category) | is.na(text) | gsub(" ", '', text) == '') %>%
+  count()
+```
+
+Now that we know none of our data is missing, we can do some manipulation of the `text` field to make the strings it contains easier for the classifier to make accurate predictions. To do this, the cell below transforms the `text` field into a corpus via the `tm` package. This transformation allows for the usage of the `tm_map` function, which provides a number of handy tools for modifying text used in NLP. In this case, the following changes (along with their justifications) are provided below: 
+
+1. **Transform all the text to lowercase:** The classifier we will use words by finding the counts of words that appear in text. We want to make sure that two of the same words are counted together even if they have different capitalization patterns.
+
+2. **Remove all the punctuation from the texts:** Punctuation characters provide no additional useful information for our classifier. 
+
+3. **Remove "stop words":**. Stop words are commonly used English words such as "the" and "a", that don't really provide any important information to the text as a whole. By removing these words, the classifier can focus on those words that give more weight to the text's overall meaning. Lists of stop words can vary, but the list used in this case comes from the the `tm` package's `stopwords()` function. 
+
+The cell below performs the list transformations listed above, and then adds the cleaned text message back to the `texts` dataframe in a new column called `clean_text`. 
+
+```{r}
+# transform to corpus
+corp <- Corpus(VectorSource(as.list(texts$text)))
+# make all text lowercase
+corp <- tm_map(corp, content_transformer(tolower))
+# remove all punctuation from text
+corp <- tm_map(corp, removePunctuation)
+# remove stop words
+corp <- tm_map(corp, removeWords, stopwords("en"))
+
+# transform back to dataframe
+corp_df <- data.frame(
+  text = sapply(corp, as.character), stringsAsFactors = FALSE)
+corp_df$text_id <- 1:nrow(corp_df)
+colnames(corp_df)[1] <- 'clean_text'
+
+# add cleaned texts back to original dataframe
+texts <- texts %>% 
+  left_join(corp_df, on="text_id")
+
+texts <- select(texts, text_id, text, clean_text, category)
+head(select(texts, text_id, clean_text))
+```
+
+## Creating a TF-IDF Matrix
+
+To actually train our model, we will use term frequency-inverse document frequency (TF-IDF) matrix. The TD-IDF value for a word in a group of documents (in this case, text messages are our documents) is the result of multiplying together the word's term frequency (information about how much a word appears in the documents) by the word's inverse term frequency (information about the relative rarity of the word in all the documents). This means that a term will be rated as more important if it appears multiple times within the same document, but this importance might wane if the word also appears in numerous other documents. In essence, the TD-IDF metric is just a way of measuring how important each word is in a set of documents. This [Medium article](https://medium.com/analytics-vidhya/tf-idf-term-frequency-technique-easiest-explanation-for-text-classification-in-nlp-with-code-8ca3912e58c3) provides more in depth explanation, if desired. 
+
+In R, creating a TD-IDF matrix is very simple, and is done in the cell below:
+
+```{r, warning=FALSE}
+tfidf_mat <- DocumentTermMatrix(corp, control = list(weighting = weightTfIdf))
+
+tfidf_df <- as.data.frame(as.matrix(tfidf_mat))
+tfidf_df$text_id <- 1:nrow(tfidf_df)
+
+inspect(tfidf_mat)
+```
+
+The output above shows what the TF-IDF matrix looks like: it creates a field for every word in the entire set of text messages (9,158) and then a row for each document. The TF-IDF calculation is then performed for each word/document combination and then inputted into the matrix as the values. Note that all the above values are 0, which is to be expected. TD-IDF matrices are typically sparse (contain mostly 0s) due to the fact that each document only contains a small subset of the total words used in the corpus. 
+
+# Exploratory Data Analysis
+
+Before actually building and training our model, we can used our cleaned dataset and TF-IDF matrix to perform some initial analysis. First, the cell below creates a plot of the breakdown between spam and ham messages:
+
+```{r}
+plt_data <- texts %>%
+  group_by(category) %>% 
+    summarise(count_category = n()) %>%
+      mutate(category = ifelse(category==1, 'Spam', 'Ham'))
+
+ggplot(data=plt_data, aes(x=category, y=count_category)) +
+  geom_bar(stat='identity') +
+  coord_flip() +
+  labs(
+    y = ' # of Text Messages',
+    title = 'Breakdown of Text Message Category'
+  )
+
+```
+
+As is probably expected, there are far more legitimate text messages than there are spam ones. The exact numbers are shown below:
+
+```{r}
+plt_data
+```
+
+The cell below creates a plot of the number of words that occur at each frequency in the corpus. 
+
+```{r}
+num_found_terms = 0
+i = 0
+freq_counts <- data.frame(matrix(ncol = 2, nrow = 0))
+
+
+while(num_found_terms < ncol(tfidf_df) - 1) {
+  num_words <- length(findFreqTerms(tfidf_mat, i, i+1))
+  tmp <- cbind.data.frame(i+1, num_words)
+  freq_counts <- rbind(freq_counts, tmp) # (18)
+
+  i <- i + 1
+  num_found_terms = num_found_terms + num_words
+}
+
+colnames(freq_counts) <- c('frequency', 'num_words')
+
+ggplot(freq_counts, aes(x=frequency, y=num_words)) + 
+  geom_line() +   
+  labs(
+    x = "Frequency in Corpus",
+    y = "Word Count at Frequency",
+    title = "How Many Words Occur at Each Frequency in the Corpus",
+  ) 
+```
+
+Also as to be expected, the vast majority of words tend to have low frequencies in the corpus. As we move to the right of the plot we see that the words with higher frequencies tend to be part of a smaller group. 
+
+Lastly, the cell below gives us an idea of some of the most common words used in our corpus by creating a word cloud:
+
+```{r, warning=FALSE}
+word_cloud_corp <- TermDocumentMatrix(corp)
+words <- sort(rowSums(as.matrix(word_cloud_corp)),decreasing=TRUE) 
+word_cloud_df = df <- data.frame(word = names(words),freq=words)
+
+set.seed(seed=seed)
+wordcloud(words = word_cloud_df$word, freq = word_cloud_df$freq, min.freq = 1,           max.words=200, random.order=FALSE, rot.per=0.35,            colors=brewer.pal(8, "Dark2"))
+```
+
+As we can see above, the word cloud indeed shows some very common words you'd expect to see in text messages!
+
+# Predict Spam Messages
+## Prepare Data
+
+Before we begin training our model, the cell below splits our data into testing and training datasets, and stores them as the following four matrices:
+
+* `x_train`: The TF-IDF matrix that will be used to train the Naive Bayes model.
+* `y_train`: The category of each text in the `x_train` data.
+* `x_test`: The TF-IDF matrix that will be used to create predictions from the trained Naive Bayes model. 
+* `y_train`: The category of each text in the `y_train` data. It will be used to evaluate the model's performance. 
+
+The data was split so that 70% of the data goes to the training dataset. 
+
+```{r}
+set.seed(seed = seed)
+
+texts_train <- texts %>% sample_frac(0.70)
+texts_test  <- anti_join(texts, texts_train, by = 'text_id')
+
+x_train <- texts_train %>% 
+  select(text_id) %>%
+    inner_join(tfidf_df, by='text_id') %>%
+      select(-text_id)
+x_test <- texts_test %>% 
+  select(text_id) %>%
+    inner_join(tfidf_df, by='text_id') %>%
+      select(-text_id)
+
+y_train <- as.matrix(select(texts_train, category))
+y_train <- 
+  factor(as.matrix(y_train), levels = c(1, 0), labels = c("yes", "no"))
+y_test <- as.matrix(select(texts_test, category))
+y_test <- 
+  factor(as.matrix(y_test), levels = c(1, 0), labels = c("yes", "no"))
+```
+
+The cell below creates and trains a Multinomial Naive Bayes model using our training dataset. The Naive Bayes classifier uses Baye's theorem at its core to predict the probabilities that a record belongs to a given category. In this case, the classifier will be used to predict the probability that a text message is spam. If the probability exceeds 50%, we will say that the message has been classified as such. Naive Bayes models are a solid choice for document classification due to this probability calculation, as well as the fact that they can handle large numbers of features without a terrible reduction in performance. The multinomial version of the model was used in this case because the predictor variable values can be continuous, allowing us to use our previously created TF-IDF matrix. More info on how the Naive Bayes classifier works can be found in this [medium article](https://towardsdatascience.com/the-naive-bayes-classifier-how-it-works-e229e7970b84).
+
+```{r, warning=FALSE}
+nb_model <- multinomial_naive_bayes(x_train, y_train)
+nb_model
+```
+
+Now that the model has been trained, we can use it to predict the class of the texts contained in `x_test`. The cell below creates these predictions and then produces a confusion matrix by comparing these predictions to the actual categories contained in `y_test`.
+
+```{r}
+y_pred <- predict(nb_model, as.matrix(x_test), type='class')
+confusionMatrix(table(y_pred , y_test))
+```
+
+While we see an accuracy score of ~91% (!), we must remember that due to the class imbalance of our dataset it is much more useful to look at metrics such as recall (Sensitivity) and precision (Pos Pred Value). We see from these metrics that while our classifier was able to capture almost every instance of spam (it only missed 6), it was a little overzealous: it incorrectly categorized 144 legitimate text messages as spam. 
+
+To get a visual of these metrics we can create a ROC plot, which is done in the cell below. 
+
+```{r}
+# to get ROC curve we need to first predict probabilities as opposed to class
+y_pred_prob <- predict(nb_model, as.matrix(x_test), type='prob')
+
+# create ROC curve
+pred = prediction(y_pred_prob[,1], y_test)
+roc = performance(pred,"tpr","fpr")
+plot(roc, colorize = T)
+abline(a = 0, b = 1) 
+
+```
+
+Given the deviation of the ROC curve from the line $y=x$, we can conclude that our model has performed quite respectably. We can get a quantitative measure of this by calculating the area under this curve (AUC):
+
+```{r}
+auc <- performance(pred, measure = "auc")
+auc@y.values[[1]]
+```
+
+The high AUC value (it ranges from 0-1) gives us definitive proof of the high quality of the model. 
+
+# Conclusion 
+
+While the Multinomial Naive Bayes model created did show off an impressive ROC curve and AUC score, there is definitely room for improvement. Its weakest aspect by far is its precision: it classified a large number of legitimate text messages as spam. While the recall was extremely high, a better model in this case might be one prioritizes precision over recall. Most people would probably prefer to have a few spam messages sneak in and get all of their legitimate messages, as opposed to having almost no spam but might occasionally miss some important texts. This is a next step for the model, and could be improved by further hyper parameter tuning or the evaluation of different Naive Bayes/word vectorization methodologies. 
