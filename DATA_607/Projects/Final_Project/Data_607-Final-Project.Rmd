@@ -1,0 +1,761 @@
+---
+title: "Influence of Campaign Finance on the Outcomes of the 2018 Midterm Elections"
+author: "William Jasmine"
+date: "2022-12-07"
+params:
+  key:
+    label: "Input FEC API Key..."
+    value: ""
+    input: text
+output:
+  pdf_document: default
+  html_document:
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+    number_sections: true
+abstract: "Election cycles in the United States are anything but simple. Months and even years before elections take place, citizens are bombared with political ads, events, and media appearances. In order to fund these activities and more, candidates in U.S. elections require a lot of one thing: money. In recent history, billions of dollars are spent each election cycle by candidates hoping to beat out their opponents. But does this spending work? The work shown here combines election results and campaign finance data from the 2018 midterms to provides a clear answer: yes. Resoundingly. After an extensive data cleaning process, the resulting dataset shows that for close to 70% of those elections studied, the candidate who spent the most on their campaigns also won their election."
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include=FALSE}
+# Set seed so results are reproducible
+seed <- 1234
+
+# Imports needed to run the .Rmd file.
+library("RCurl")
+library("jsonlite")
+library("tidyverse") 
+library("rvest")
+library("XML")
+library("httr")
+library("stringdist")
+```
+
+
+# Introduction
+
+## Context 
+
+Compared to the rest of many other democracies in the world, elections in the United States tend [to last a very long time](https://www.npr.org/sections/itsallpolitics/2015/10/21/450238156/canadas-11-week-campaign-reminds-us-that-american-elections-are-much-longer). For presidential elections, nominees typically announce their candidacy over a year (and sometimes multiple years) in advance, and US citizens are exposed to political advertising and showmanship on what seems like a nearly constant basis. As such, in order for candidates to be able to have a shot at competing in an election they need a lot of one thing: money. Candidates have a multitude of fundraising options when it comes to financing their campaigns including, but not limited to individual contributors, political action committees (PACs), and publicly funded state/federal grants. Candidates with more money seemingly have a huge advantage in that they have more to spend on ads, staff, events, etc. In 2018 a staggering [$5.7 billion dollars](https://www.cnn.com/2019/02/07/politics/midterm-election-costs-topped-5-7-billion) was spent on campaigns for midterm elections, making it at the time the most expensive midterm election cycle ever. This kind of extraordinary spending on U.S. political elections makes citizens question: are our elections fair? 
+
+## Purpose/Research Question
+
+The purpose of this project is to determine the influence of campaign spending on the outcomes of the 2018 congressional midterms. To achieve this purpose, campaign finance data has been sourced from the publicly available [Federal Election Commission (FEC) API](https://api.data.gov/docs/fec/), and election result data for both the [U.S. Senate](https://www.kaggle.com/datasets/cviaxmiwnptr/us-senate-cook-rating-election-results-19762018) and [U.S. House of Representatives](https://www.kaggle.com/datasets/cviaxmiwnptr/us-house-cook-ratings-election-results-20022018) has been retrieved from Kaggle via web scraping of [The Cook Political Report](https://www.cookpolitical.com/about). 
+
+
+# Importing/Collecting Data
+## Campaign Finance Data
+
+The FEC open data platform only allows a single API call to retrieve 100 results. As such, the code chunk below creates a function that will pull all results from a API call, given a valid API URL and election year. 
+
+```{r define-get_api_results}
+
+#' Function: get_api_results
+#' Returns all api results from FEC open data api and stores as a dataframe.
+#' - api_url: should be one listed from https://api.open.fec.gov/developers/
+#' - api_key: should be the user api_key for the FEC open data API. Users can 
+#'   sign up for an api key at https://api.open.fec.gov/developers.
+#' - year: the election year for which you'd like to retrieve data.
+
+get_api_results <- function(api_url, api_key, year){
+
+  print(paste("Pulling data from", api_url))
+  api_call <- paste(api_url, '?api_key=', api_key, '&election_year=', year,
+                    '&per_page=1&page=1', sep='')
+  
+  pre_result <- fromJSON(api_call, flatten = TRUE) %>% data.frame 
+  num_cols <- ncol(pre_result)
+  columns <- colnames(pre_result)
+  num_results <- pre_result$pagination.count[[1]]
+  
+  i = 0
+  result <- data.frame(matrix(ncol = num_cols, nrow = 0))
+  colnames(result) <- columns
+
+  while (i * 100 < num_results){
+    api_call <- paste(api_url, '?api_key=', api_key, '&election_year=', year,
+                      '&per_page=100&page=', i + 1, sep='')
+    tmp <- fromJSON(api_call, flatten = TRUE) %>% data.frame
+    result <- rbind(result, tmp)
+    print(
+      paste('On  result ', i*100, '-', (i+1)*100, ' out of ', num_results,
+            sep = '')
+    )
+    i = i + 1
+  }
+  return(result)
+}
+```
+
+In this case, we will use the API to pull data from two different sources, the first provides [genral information about the candidates](https://api.open.fec.gov/v1/candidates/), while the second pulls [each candidate's campaign finanace data](https://api.open.fec.gov/v1/candidates/totals/). The code chunk below utilizes the `get_api_results` function to pull this information for all of the 2018 congressional elections. 
+
+```{r get-api-data, results='hide'}
+election_year <- 2018
+api_key <- params$key
+# Un-comment below line for manual entry.
+#api_key <- 'dummy-api-key'
+
+cand_info <- get_api_results(
+  api_url = 'https://api.open.fec.gov/v1/candidates/',
+  api_key = api_key,
+  year = election_year
+)
+
+financial_info <- get_api_results(
+  api_url = 'https://api.open.fec.gov/v1/candidates/totals/',
+  api_key = api_key,
+  year = election_year
+)
+```
+
+The candidate and finance data is stored in the `cand_info` and `financial_info` dataframes, respectively.
+
+## Election Result Data
+
+The election result data has been uploaded to Github as `.csv` files ([Senate data](https://github.com/williamzjasmine/CUNY_SPS_DS/blob/master/DATA_607/Projects/Final_Project/data/1976-2018_senate_election_ratings_results.csv), [House data](https://github.com/williamzjasmine/CUNY_SPS_DS/blob/master/DATA_607/Projects/Final_Project/data/2002-2018_house_election_ratings_results.csv)), which are imported in the code chunk below: 
+
+```{r get-election-result-data}
+link <- getURL('https://raw.githubusercontent.com/williamzjasmine/CUNY_SPS_DS/master/DATA_607/Projects/Final_Project/data/1976-2018_senate_election_ratings_results.csv')
+senate_results <- read_csv(link)
+
+link <- getURL('https://raw.githubusercontent.com/williamzjasmine/CUNY_SPS_DS/master/DATA_607/Projects/Final_Project/data/2002-2018_house_election_ratings_results.csv')
+house_results <- read_csv(link)
+```
+
+The above chunk has created two new dataframes to hold all the election results: `senate_results` and `house_results`.
+
+# Cleaning Data
+
+Now that all the data has been properly imported, the section below outlines all the data cleaning steps that were taken to manipulate it into a usable format for data analysis. The main goal is to unite all four of the dataframes that currently store the data (`cand_info`, `financial_info`, `senate_results`, `house_results`). 
+
+## Election Result Data
+
+This subsection is dedicated to cleaning the two dataframes containing the information about election results (`senate_results`, `house_results`) in an effort to combine them. 
+
+### Clean Individual Dataframes
+
+The `.csv` files containing the election result data actually included results for multiple election cycles. As such, the cell below filters the data to include only those elections that occurred in 2018:
+
+```{r filter-2018-only}
+senate_results <- senate_results %>% filter(year == '2018')
+house_results <- house_results %>% filter(year == '2018')
+```
+
+--
+
+Next, the code chunk below creates a separate `state` and `district` field using the `district` column of the `house_results` dataframe (currently the values in that column are of form STATE-DISTICT# i.e. AL-01):
+
+```{r separate-district-column}
+house_results <- house_results %>%
+  mutate(
+    state = substr(district, 1, 2), 
+    district = substr(district, 4, 5))
+```
+
+Because the `senate_results` dataframe doesn't include district (senate elections take participation from the entire state), the code cell below adds a `district` placeholder column to `senate_results` that contains the value "00". This matches the methodology that will later be seen in the API data. The code below also removes the `special` column, which is not included in the `house_results` dataframe. 
+
+```{r senate-placeholder-district}
+senate_results <- senate_results %>%
+  mutate(district = '00') %>%
+    select(-special)
+```
+
+-- 
+
+The `senate_results` dataframe has only has the voter percentages for the candidate who won, and as such, the cell below modifies the `house_results` dataframe in order to match this format:
+
+```{r clean-winner-cols}
+# Only winning parties in house results are Republican and Democratic
+# unique(house_results$winner)
+
+house_results <- house_results %>%
+  mutate(winner_party = ifelse(winner == 'r', 'Republican', 'Democrat'),
+         winner_pct = ifelse(winner == 'r', repub, dem)) %>%
+    select(-winner, -dem, -repub, -other)
+```
+
+-- 
+
+Next, we can remove the `cook_rating` and `year` columns from each of the dataframes: the Cook's rating is not pertinent to answering the project's research question, and the `year` column provides no additional information as we know all election data is from 2018. 
+
+```{r remove-cook-year}
+house_results <- select(house_results, -cook_rating, -year)
+senate_results <- select(senate_results, -cook_rating, -year)
+```
+
+### Join Together 
+
+Now that the `senate_results` and `house_results` dataframes have the same format, they can be appended together. This is performed in the code chunk below: 
+
+```{r combine-election-results}
+house_results <- house_results %>%
+  select(winner_name, winner_party, winner_pct, state, district) %>%
+    mutate(house = 'House')
+
+senate_results <- senate_results %>%
+  select(winner_name, winner_party, winner_pct, state, district) %>%
+    mutate(house = 'Senate')
+
+election_results <- rbind(house_results, senate_results)
+```
+
+Note that in the above code, a `house` column is added that contains one of either "Senate" or "House" in order to know the source of each observation. 
+
+This `election_results` dataframe represents the final, cleaned version of the data from the `.csv` files. 
+
+## API Data
+
+This subsection is dedicated to cleaning the two dataframes containing the information from the FEC (`cand_info`, `financial_info`) in an effort to combine them. 
+
+### Clean Individual Dataframes
+
+The first step in cleaning the `cand_info` and `financial_info` dataframes is to
+replace the nested field names that were a result of the api call. For example, the field containing the candidate's name is `results.candidate` as opposed to just `candidate`. The code below fixes this: 
+
+```{r clean-api-colnames}
+colnames(cand_info) <- 
+  str_replace_all(colnames(cand_info), 'results.', '')
+colnames(financial_info) <- 
+  str_replace_all(colnames(financial_info), 'results.', '')
+```
+
+--
+
+Before any further cleaning takes place, the cell below checks to make sure that there exists only 1 row per `candidate_id` in the `cand_info` dataframe, ensuring that the API did not output any duplicate rows. 
+
+```{r check-cand-info-dupes}
+cand_info %>%
+  group_by(candidate_id) %>%
+    summarise(num_cand_rows = n()) %>%
+      filter(num_cand_rows > 1)
+```
+
+--
+
+Unfortunately, the `district` field in the `cand_info` dataframe only provides the number of the district that the candidate most recently ran for office in. For example, [Tom Alciere ran for New Hampshire's 2nd district in 2018](https://ballotpedia.org/Tom_Alciere), but because he ran again in New Hampshire's 1st district in 2022, the `district` column states:
+
+```{r bad-district-example}
+cand_info %>%
+  filter(name == "ALCIERE, TOM") %>% 
+    select(district)
+```
+
+To get the actual district each candidate ran in, we have to parse the `elections` and `districts` columns, which provide lists of the the election years that the candidate ran and the districts that they ran in, respectively. This is done in the cell below to determine the district the candidate ran in in 2018: 
+
+```{r clean-districts-column}
+i = 0 
+districts <- c()
+
+while(i < nrow(cand_info)) {
+  tmp <- cand_info$election_years[[i+1]]
+  tmp <- match(election_year, tmp)[[1]]
+  district <- cand_info$election_districts[[i+1]][tmp]
+  districts <- append(districts, district)
+  i <- i + 1
+}
+
+cand_info$district <- districts
+```
+
+--
+
+Next, the code chunk below selects out only the pertinent fields from the `cand_info` dataframe:
+
+```{r select-relevant}
+cand_info <- cand_info %>% 
+  select(
+    candidate_id, name, party_full, state, district, has_raised_funds,
+    office_full, election_years, election_districts, incumbent_challenge_full
+  )
+```
+
+-- 
+
+The cell below creates three new fields from this reduced dataframe that might be interesting for use in future analysis: 
+
+ * `num_runs`: The number of times the candidate has run for office up to and including the 2018 election cycle.
+ * `houses_run`: Can be either "house", "senate", or "both", indicating what offices the candidate has run for up to and including the 2018 election cycle. 
+ * `num_districts`: The number of house districts the candidate has run in seats for the House of Representatives up to and including the 2018 election. 
+
+It also cleans the `election_districts` and `election_years` columns to only include those entries up until 2018.
+ 
+```{r create-districts-cols}
+i = 0
+num_runs_vec <- c()
+houses_run_vec <- c()
+num_districts_vec <- c()
+
+while(i < nrow(cand_info)) {
+  tmp <- cand_info$election_years[[i+1]]
+  tmp <- match(election_year, tmp)[[1]]
+  num_runs_vec <- append(num_runs_vec, tmp)
+  
+  districts <- unique(cand_info$election_districts[[i+1]][1:tmp])
+  ran_senate <- FALSE
+  
+  if ("00" %in% districts){
+    ran_senate <- TRUE
+  }
+  districts <- districts[districts != "00"]
+  num_districts <- length(districts)
+
+  if (ran_senate == FALSE) {
+    houses_run <- 'house'  
+  }
+  else {
+    if (num_districts > 1) {
+      houses_run <- 'both'
+    }
+    else {
+      houses_run <- 'senate'
+    }
+  }
+  
+  houses_run_vec <- append(houses_run_vec, houses_run)
+  num_districts_vec <- append(num_districts_vec, num_districts)
+  cand_info$election_years[[i+1]] <- 
+    cand_info$election_years[[i+1]][1:tmp]
+  cand_info$election_districts[[i+1]] <-
+    cand_info$election_districts[[i+1]][1:tmp]
+  i = i+1
+}
+
+cand_info$num_runs <- num_runs_vec
+cand_info$houses_run <- houses_run_vec 
+cand_info$num_districts <- num_districts_vec
+```
+
+---
+
+Unlike the `cand_info` dataframe, the cell below shows that in `financial_info` there are a number of candidates that appear more than once: 
+
+```{r financial-info-check-dupes}
+financial_info %>%
+  group_by(candidate_id) %>%
+    summarise(num_cand_rows = n()) %>%
+      filter(num_cand_rows > 1) %>% nrow()
+```
+
+After further inspection, it appears that this is due to the presence of duplicates in the dataframe. They are removed in the cell below:
+
+```{r}
+financial_info <- financial_info %>%
+  select(-contains("pagination")) %>%
+    distinct()
+```
+
+### Join Together
+
+Now that the `cand_info` and `financial_info` dataframes have been cleaned, they can be joined together using the FEC's `candidate_id` field. This is done in the cell below, which stores the combined data in the `campaign_finance` dataframe.
+
+```{r join-api-data}
+campaign_finance <- cand_info %>%
+  left_join(financial_info, by = 'candidate_id', suffix = c("", ".y")) %>%
+    select(-contains('.y')) 
+```
+
+Finally, we select only the pertinent columns from the `campaign_finance` dataframe.
+
+```{r get-relevant-cols}
+campaign_finance <- campaign_finance %>%
+  select(
+    candidate_id,
+    name,
+    party_full,
+    state,
+    district,
+    has_raised_funds,
+    office_full,
+    election_years,
+    election_districts,
+    incumbent_challenge_full,
+    houses_run,
+    num_runs,
+    num_districts,
+    cash_on_hand_end_period,
+    federal_funds_flag,
+    individual_itemized_contributions,
+    other_political_committee_contributions,
+    disbursements
+  )
+
+```
+
+## Bringing it All Together 
+
+The final data cleaning step needed before analysis can be performed is to combine the `campaign_finance` and `election_results` dataframes. The code chunk below attempts to do this via a left join on `state` and `district`:
+
+```{r join-all-data}
+df <- campaign_finance %>%
+  left_join(
+    election_results, by = c('state', 'district'), 
+    suffix = c('', '.y')
+  ) %>%
+    select(-contains('.y'))
+```
+
+After the above join, all of the originally imported data now exists in a single dataframe `df`. However, looking at the output of this join reveals that it produced more rows than are in the `campaign_finance` dataframe. This means that our join key is not unique, and we are duplicating rows. The cell below shows the reason why:
+
+```{r check-dupes-final}
+election_results %>%
+  group_by(state, district) %>%
+    summarise(count = n()) %>%
+      filter(count > 1)
+```
+
+Because senate races don't include districts, the FEC data uses "00" as a placeholder value in the `district` column if a candidate ran for senate. Based on this information and the output above, we can see that in 2018 both the state of Minnesota and Mississippi had two senate races thanks to special elections. As such, the `state, district` combination is not a unique key in these cases, and all candidates who ran in these races will be counted twice. Because our data has no way to determine which candidates ran against each winner, we remove them from the data in the cell below:
+
+```{r show-mn-ms-special-elections}
+df <- df %>%
+  filter(!(district == '00' & (state %in% c('MN', 'MS'))))
+
+# check to make sure join key is now unique
+nrow(df) == nrow(
+  filter(campaign_finance, !(district == '00' & (state %in% c('MN', 'MS')))))
+
+```
+
+The output above reveals that the combination of `district`, and `state` is now a unique key thanks to removing these duplicated values. 
+
+--
+
+The cell below modifies the party fields from our two original dataframes to be the same format. Namely, the `party` and `winner_party` fields will only contain the values "DEMOCRATIC PARTY", "REPUBLICAN PARTY", or "OTHER".
+
+```{r clean-party-cols}
+df <- df %>%
+  mutate(
+    winner_party = case_when(
+      winner_party == 'Democrat' ~ "DEMOCRATIC PARTY",
+      winner_party == 'Republican' ~ "REPUBLICAN PARTY",
+      TRUE ~ "OTHER"),
+    party_full = ifelse(party_full != "DEMOCRATIC PARTY" &
+                         party_full != "REPUBLICAN PARTY",
+                         "OTHER", party_full)
+  )
+```
+
+--
+
+Now that the data has been joined together, we can create combine the information in each. Because the candidate names have different formats in the `election_results` and `campaign_finance` dataframes, the cell below attempts to transform the `winner_name` field from `election_results` the FEC's naming format used in `campaign_finance`'s `name` field (i.e. John Smith --> SMITH, JOHN): 
+
+```{r map-candidate-names}
+mapped_names <- c()
+
+for (i in 1:nrow(df)){
+  name <- toupper(df$winner_name[[i]])
+  split_name <- strsplit(name, split = " ", fixed = TRUE)[[1]]
+  last_name <- tail(split_name, 1)
+  first_name <- paste(split_name[1:length(split_name) - 1], collapse = ' ')
+  mapped_name <- paste(last_name, ', ', first_name, sep = '')
+  mapped_names <- append(mapped_names, mapped_name)
+}
+
+df$winner_name_clean <- mapped_names
+```
+
+We create a column, `winner` that compares the new `winner_name_clean` field to `name`. More specifically, the value of this field will be 1 if the names match, and 0 if not. 
+
+
+```{r create-winner-col}
+df <- df %>%
+  mutate(winner = ifelse(winner_name_clean == name, 1, 0))
+```
+
+--
+
+Because this name matching will not be perfect (i.e. it doesn't take into account different spellings, prefixes, suffixes, titles, etc.) the cell below checks to see for which of the races we were actually able to determine who the winner was: 
+
+```{r count-matched-elections}
+df %>% 
+  group_by(winner) %>%
+    summarise(count_classes = n())
+```
+
+Due to the difficult nature of matching names, it looks as though only 185 of our 470 elections results are able to be used. While this is a dramatic decrease, it still provides a robust sampling of the 2018 midterm results. The cell below removes rows from those elections in which a winner could not be determined:  
+
+```{r filter-missing-elections}
+filter_df <- df %>% 
+  filter(winner == 1) %>%
+    select(state, district) %>%
+      group_by(state, district)
+    
+df <- df %>%
+  inner_join(filter_df, by = c('state', 'district'))
+```
+
+--
+
+Because not every candidate raised funds in the 2018 midterm elections, a number of the financial fields remain null after the join (i.e. there was information for a candidate in `cand_info`, but not in `financial_info`). The cell below transforms these values to 0:
+
+```{r clean-money-cols}
+df$cash_on_hand_end_period[
+  is.na(df$cash_on_hand_end_period)] = 0
+
+df$individual_itemized_contributions[
+  is.na(df$individual_itemized_contributions)] = 0
+
+df$other_political_committee_contributions[
+  is.na(df$other_political_committee_contributions)] = 0
+
+df$disbursements[is.na(df$disbursements)] = 0
+```
+
+--
+
+Answering this project's research question requires knowing the candidates who spent the most in their respective elections. Because the data is available, we can also determine who received the most itemized individual contributions and political committee contributions as well. Fields containing this information are added to `df` in the cell below:
+
+```{r get-maxes, warning=FALSE}
+max_spent_df <- df %>%
+  group_by(state, district) %>%
+    summarise(
+      max_disbursements = max(disbursements),
+      max_iic = max(individual_itemized_contributions),
+      max_pac = max(other_political_committee_contributions),
+      num_candidates = n()
+    )
+
+df <- df %>% 
+  left_join(max_spent_df, by = c("state", "district")) %>%
+    mutate(
+      iic_most = ifelse(individual_itemized_contributions == max_iic, 1, 0),
+      pac_most = 
+        ifelse(other_political_committee_contributions == max_pac, 1, 0),
+      spent_most = ifelse(disbursements == max_disbursements, 1, 0))
+```
+
+--
+
+Lastly, the cell below creates an additional three binary columns to track if those candidates who spent the most, received the most individual itemized contributions, or received the most political committee contributions also won their elections. 
+
+```{r combine-winner-maxes-cols}
+df <- df %>%
+  mutate(
+    winner_iic_most = ifelse(iic_most & winner == 1, 1, 0),
+    winner_pac_most = ifelse(pac_most & winner == 1, 1, 0),
+    winner_spent_most = ifelse(spent_most == 1 & winner == 1, 1, 0))
+```
+
+--
+
+For the concluding data cleaning step, the cell below picks out the final set of columns from `df` and names them appropriately: 
+
+```{r final-cleanup}
+df <- df %>%
+  select(candidate_id, name, winner_name, winner_name_clean, party_full,
+         winner_party, state, district, election_years, 
+         election_districts, incumbent_challenge_full, houses_run, num_runs,
+         num_districts, has_raised_funds, federal_funds_flag,
+         cash_on_hand_end_period, individual_itemized_contributions,
+         other_political_committee_contributions, disbursements,
+         max_iic, max_pac, max_disbursements, num_candidates, winner,
+         iic_most, pac_most, spent_most, winner_iic_most, winner_pac_most,
+         winner_spent_most)
+
+colnames(df) <- c(
+  "candidate_id", "candidate_name", "winner_name", "winner_name_clean",
+  "party", "winner_party", "state", "district", "election_years",
+  "election_districts", "candidate_type", "houses_run", "num_runs", 
+  "num_districts", "raised_funds", "raised_federal_funds", "coh_end_period",
+  "iic", "pac", "disbursements", "max_iic", "max_pac", "max_disbursements",
+  "num_candidates", "winner", "iic_most", "pac_most", "spent_most",
+  "winner_iic_most", "winner_pac_most", "winner_spent_most")
+```
+
+The `df` dataframe represents the final, cleaned dataset that will be used in the following analysis. For reference, a list of its fields along with their descriptions is provided below:
+
+Column Name  | Column Type | Description
+------------- | ------------- | -------------
+`candidate_id` | id_field | The id number for each candidate, provided by the FEC.   
+`candidate_name` | text | The name of the candidate as it appears in the FEC databases. 
+`winner_name` | text | The name of the candidate who won the 2018 midterm election that the candidate ran in. Name is as it appears in the Cook Political Report.         
+`winner_name_clean` | text | An attempt to match the format of the names in `winner_name` to those in `candidate_name`. (Matching Cook political report format to FEC format.)
+`party` | categorical | The party affiliation of the candidate. Can be one of "DEMOCRATIC PARTY", "REPUBLICAN PARTY", or "OTHER".
+`winner_party` | categorical | The party affiliation of the candidate who won the 2018 midterm election that the candidate ran in. Can be one of "DEMOCRATIC PARTY", "REPUBLICAN PARTY", or "OTHER".   
+`state` | categorical | The state of the 2018 midterm election that the candidate ran in. Uses U.S. postal codes.                 
+`district` | text | The congressional district of the 2018 midterm election that the candidate ran in. If the candidate ran in a senate race, the value in this field is equal to "00".
+`election_years` | vector | A vector field containing all the election years that the candidate ran in, up to and including the 2018 election cycle. (i.e. c("2014", "2016", "2018").)   
+`election_districts` | vector | A vector field containing all the congressional districts that the candidate has run in, up to and including the 2018 election cycle. This field aligns with the `election_years` field in that the $n$th entry of `election_districts` is the district the candidate ran in during the year contained in the $n$th entry of `election_years`.
+`candidate_type` | categorical | Describes the type of election the candidate participated in. Can be one of "Challenger", "Open seat", or "Incumbent".
+`houses_run` | categorical | Describes which houses of congress the candidate has ran in historically, up to and including the 2018 election cycle. Can be one of "House", "Senate", or "Both".
+`num_runs` | numerical (discrete) | The number of times the candidate has run for congressional political office, up to and including the 2018 election cycle.
+`num_districts` | numerical (discrete) | The number of congressional districts the candidate has run in for congressional political office, up to and including the 2018 election cycle.        
+`raised_funds` | binary | TRUE if the candidate has raised any money for their political campaign, FALSE if not.      
+`raised_federal_funds` | binary | TRUE if the candidate has received any federal grants to fund their campaign, FALSE is not.
+`coh_end_period` | numerical (continuous) | The amount of cash on hand in USD that the candidate had remaining on their books at the end of the pertinent accounting period.      
+`iic` | numerical (continuous) | The amount of money in USD that the candidate has raised from individual itemized contributions. These are contributions from individuals that exceed $200.                
+`pac` | numerical (continuous) | The amount of money in USD that the candidate has raised from political committee contributions, such as political action committees.  
+`disbursements` | numerical (continuous) | The amount of money in USD that the candidate has spent to cover the expenditures of their campaign. This field is the closest estimate of the amount of total money spent by the candidate. 
+`max_iic` | numerical (continuous) | The total from the candidate with the largest total individual itemized contributions in the 2018 midterm election race that the candidate participated in. 
+`max_pac` | numerical (continuous) | The total from the candidate with the largest total political committee contributions in the 2018 midterm election race that the candidate participated in. 
+`max_disbursements` | numerical (continuous) | The disbursements from the candidate who spent the most in the 2018 midterm election race that the candidate participated in. 
+`num_candidates`| numerical (discrete) | The number of candidates that competed in the 2018 midterm election the candidate participated in (inclusive of their own participation).       
+`winner` | binary | 1 if the candidate won the 2018 midterm election they participated in, 0 if not.    
+`iic_most` | binary | 1 if the candidate had the `max_iic` amount in the 2018 midterm election they participated in, 0 if not. 
+`pac_most` | binary | 1 if the candidate had the `max_pac` amount in the 2018 midterm election that they participated in, 0 if not.
+`spent_most` | binary | 1 if the candidate had the `max_disbursement` amount in the midterm election they participated in, 0 if not.     
+`winner_iic_most` | binary | 1 if the candidate won and had the `max_iic` amount, 0 if not. 
+`winner_pac_most` | binary | 1 if the candidate won and had the `max_pac` amount, 0 if not. 
+`winner_spent_most`| binary | 1 if the candidate won and had the `max_disbursement` amount, 0 if not. 
+
+# Data Analysis
+
+First, we can take a look to see how much money was spent by either party in the races we have data for:
+
+```{r hist-party-spending, fig.align='center', out.width='60%', fig.cap='Fig 1: Total campaign spending by party. Democrats clearly spent more in the 2018 midterm elections.'}
+plt_data1 <- df %>%
+  filter(!is.na(party)) %>%
+    group_by(party) %>%
+      summarise(party_disbursements = sum(disbursements)) %>%
+        arrange(desc(party_disbursements))
+
+ggplot(data <- plt_data1, 
+       aes(x=reorder(party, party_disbursements),
+           y=party_disbursements)
+      ) +
+  geom_bar(stat = 'identity') +
+    labs(
+      x = '',
+      y = 'Money Spent on Campaigns'
+    )
+
+```
+
+As is clear in the plot above, the Democratic Party as a whole put up a lot more money, which makes sense given that they were trying to get back control of a Republican controlled congress. 
+
+--
+
+The code chunk below creates a similar histogram to the one above, but this time compares how many races were won by each party: 
+
+```{r hist-party-results, fig.align='center', out.width='60%', fig.cap='Fig 2: Results by party for the 2018 midterm elections. It is clear Democrats outperformed the republicans.'}
+plt_data2 <- df %>%
+  filter(winner == 1) %>% 
+    group_by(winner_party) %>%
+      summarise(party_election_wins = n())
+
+ggplot(data <- plt_data2, 
+       aes(x=reorder(winner_party, party_election_wins),
+           y=party_election_wins)
+      ) +
+  geom_bar(stat = 'identity') +
+    labs(
+      x = '',
+      y = 'Elections Won'
+    )
+
+```
+
+The bar chart makes it clear that the democrats peroformed quite well in the elections contained by our dataset.
+
+--
+
+If we combine the information from the previous two histograms into one, we see that the proportion of races that the democrats won is similar to the proportion of total campaign funding they put up: 
+
+```{r combined-hist, fig.align='center', out.width='60%', fig.cap='Fig 3: Compares information from the results shown in Fig 1. and Fig 2. The percetage of total money spent by each party is nearly equal to the percentage of elections that they won.'}
+plt_data1 <- plt_data1 %>%
+  mutate(pct = party_disbursements / sum(plt_data1$party_disbursements))
+plt_data1$type <- 'Election Spending'
+
+plt_data2 <- plt_data2 %>% 
+  mutate(pct = party_election_wins / sum(plt_data2$party_election_wins))
+
+plt_data2[nrow(plt_data2) + 1, ] <- list("OTHER", 0, 0)
+plt_data2$type <- 'Elections Won'
+colnames(plt_data2)[1] <- 'party'
+
+plt_data <- rbind(
+  select(plt_data1, party, pct, type),
+  select(plt_data2, party, pct, type)
+)
+
+ggplot(data <- plt_data, aes(x=reorder(party, pct), y=pct, fill = type)) + 
+  geom_bar(stat = "identity", position = position_dodge()) +
+    labs(
+      x = '',
+      y = 'Fraction of Total'
+    )
+```
+
+The output above gives the first hint that spending money on political campaigns can have a real impact. 
+
+--
+
+Next, the code chunk below plots the distribution of `dispursements` amounts:
+
+```{r disbursements-hist, warning=FALSE, fig.align='center', out.width='60%', fig.cap='Fig 4: Distrubution of disbursement amounts for all candidates. x-axis is a log scale. '}
+ggplot(data = df, aes(x = disbursements)) +
+  geom_histogram() +
+    labs(
+      x = 'Amount of Money Spent by Candidate ($)',
+      y = 'Count'
+    ) + scale_x_log10()
+
+```
+
+The plot shown above is shown on a log scale due to the fact that there is a large discrepancy between the median and maximum disbursement amounts. The plot shows that while there are a number of races that have campaign spending in the 10s of millions of dollars, we see that about half of them spend less than $100,000. If we look at the top spenders, we can see names from some pretty recognizable races, most of which were at the senate level:
+
+```{r get-top-spenders}
+df %>%
+  arrange(desc(disbursements)) %>% 
+    select(candidate_name, winner_name, state, district) %>%
+      head(10)
+```
+
+-- 
+
+To get a better idea of just how big an impact campaign spending has on election results, the cell below calculates and outputs a number of metrics: 
+
+```{r summary-stats1}
+avg_cands <- round(mean(max_spent_df$num_candidates), digits = 2)
+avg_win_rate <- round(1 / avg_cands, digits = 2)
+pct_winner_spent_most <- round(
+  sum(df$winner_spent_most) / nrow(max_spent_df), digits = 2)
+```
+
+**Average number of candidates in each race:** `r avg_cands` <br/>
+**Average win probability for a candidate to win their election, if chosen at random:** `r avg_win_rate` <br/>
+**Percentage of races in which the candidate who spent the most money also won the election:** `r pct_winner_spent_most`
+
+The results are pretty staggering: close to 70% of those candidates who spent the most on their campaigns won their election. This number actually increases when looking at who received the most funding from political committees: 
+
+```{r summary-stats2}
+pct_winner_iic_most <- round(
+  sum(df$winner_iic_most) / nrow(max_spent_df), digits = 2)
+pct_winner_pac_most <- round(
+  sum(df$winner_pac_most) / nrow(max_spent_df), digits = 2)
+```
+
+**Percentage of races in which the candidate who received the most individual itemized contributions also won the election:** `r pct_winner_iic_most`` <br/>
+**Percentage of races in which the candidate who received the most money from political committees (i.e. PACs, super-PACs) also won the election:** `r pct_winner_pac_most`
+
+While it's probably not necessary to do so, we can perform a Chi-Squared test in order to statistically confirm the dependence winning an election (`winner`) on if you spend the most money during your campaign (`spent_most`). Given $P_x$ = the probability a candidate wins their election, $P_y$ = the probability a candidate spent the most money on their election, and $P_{xy}$ = $P(X \text{and} Y)$, the null ($H_0$) and alternative hypotheses ($H_1$) are:
+
+$$
+\begin{align}
+H_0: P_{xy} &= P_x \cdot P_y \\
+H_1: P_{xy} &\neq P_x \cdot P_y
+\end{align}
+$$
+First, the cell below creates a table of the two categorical variables we are testing:
+
+```{r pre-chi-table}
+table(df$winner, df$spent_most)
+```
+
+And finally, the cell below performs the Chi-Squared test. 
+
+```{r chi-test}
+chisq.test(df$winner, df$spent_most)
+```
+
+As is probably expected, the $p$-value is well below 0.05 meaning that we reject the null hypothesis and conclude that the two variables have a dependence upon one each other. 
+
+# Conclusion
+
+While it is not necessarily surprising to think that campaign finance plays a role in the results of U.S. political elections, the scale which it is seen here is quite staggering: the fact that ~70% of elections that were included in the data were won by the candidate who spent the most money seems quite high. 
+
+The work presented here also has a number of opportunities for potential improvements and possible extensions. The most glaring improvement that could be made is in the fuzzy matching of the candidate names, which as present only allowed us to analyze 185 of the 470 2018 congressional midterm elections. Having data from most or all of the elections as well as from additional election cycles would provide greater validity to the results presented. Additionally, there are a number of other analyses that completed using fields that have not yet been taken into account.
