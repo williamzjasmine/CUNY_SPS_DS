@@ -1,0 +1,305 @@
+---
+title: "Data 605 HW1 - Image Manipulation"
+author: "William Jasmine"
+date: "2023-01-026"
+output:
+  html_document:
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+    number_sections: true
+  pdf_document: default
+---
+```{r setup, include=FALSE}
+library(tidyverse)
+library(shiny)
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Assignment Description
+
+One of the most useful applications for linear algebra in data science is image manipulation.  We often need to compress, expand, warp, skew, etc. images. To do so, we left multiply a transformation matrix by each of the point vectors.  
+
+For this assignment, build the first letters for both your first and last name using point plots in R. For example, the following code builds an H.
+
+```
+x=c(rep(0,500),seq(0,1,length.out=1000), rep(1,500))
+y=c(seq(-1,1,length.out=500),rep(0,1000), seq(-1,1,length.out=500))
+z=rbind(x,y)
+plot(y~x, xlim=c(-3,3), ylim=c(-3,3))
+```
+
+Then, write R code that will left multiply (%>%) a square matrix (x) against each of the vectors of points (y). Initially, that square matrix will be the Identity matrix.  
+
+Use a loop that changes the transformation matrix incrementally to demonstrate 1) shear, 2) scaling, 3)  rotation , and 4) projection in animated fashion.  
+Hint: Use x11() to open a new plotting window in R.
+
+```
+x=c(rep(0,500),seq(0,1,length.out=1000), rep(1,500))
+y=c(seq(-1,1,length.out=500),rep(0,1000), seq(-1,1,length.out=500))
+z=rbind(x,y)
+plot(y~x, xlim=c(-3,3), ylim=c(-3,3))
+```
+
+# Plotting the First and Last Letters of My Name
+
+## The "W"
+The first and last letters of my name are W and J, respectively. To build the "W" we can use a series of four interconnected lines with slopes -2 and -2. If we start drawing at the origin (0,0) we can use some basic algebra to determine the equations for these lines in $y=mx+b$ format:
+
+**Line 1:** $m = -2; b = 0; y = -2x$. Extend this line down to (1,  -2).
+
+**Line 2:** $m = 2; b = -4; y = 2x - 4$. Extend this line up to (-1.5, -1).
+
+**Line 3:** $m = -2;  b = 2; y = -2x + 2$. Extend this line down to (-2, -2).
+
+**Line 4:** $m = 2; b = -6; y = 2x - 6$. Extend this line up to (-3, 0).
+
+
+The cell below creates eight R vectors (four for $x$ values, four for $y$ values) using the above equations/cutoffs and plots them:
+```{r}
+x1 <- seq(0,1,length.out=1000)
+y1 <- -2 * x1
+
+x2 <- seq(1,1.5, length.out=500)
+y2 <- 2 * x2 - 4
+
+x3 <- seq(1.5, 2, length.out=500)
+y3 <- -2 * x3 + 2
+
+x4 <- seq(2, 3, length.out=1000)
+y4 <- 2 * x4 - 6
+
+x_w <- c(x1, x2, x3, x4)
+y_w <- c(y1, y2, y3, y4)
+
+w_plot <- plot(y_w~x_w, xlim=c(-1,4), ylim=c(-4,1))
+```
+
+We can see that the plot does indeed render the letter "W" (though it might looked squished or stretched depending on the scaling of the $x$ and $y$ axes).
+
+## The "J"
+Building the J can be done by combining a half circle and two lines (one of the top, and other to connect the top to the half circle). Using the endpoint of the "W" that was created above, we can define the center of the half circle to be (4.5, -1) and try using a radius of 1. The equation for a circle is $(x-x_0)^2 + (y - y_0)^2 = r^2$ where ($x_0$, $y_0$) is the circle's center and $r$ is its radius. Thus in this case:
+
+**Equation for circle:** 
+$$
+\begin{align}
+1 &= (x - 4.5)^2 + (y + 1)^2 = 1 \\
+y &= \sqrt{1 - (x  - 4.5)^2}- 1 
+\end{align}
+$$
+
+The equation for $y$ is only defined for the bottom half of the circle, which is exactly what is needed. Based off the half circle's rightmost endpoint (5.5, -1), the equations for the two other lines needed to complete the J are: $x = 5.5$ (extended from (-5.5, 1) to (-5.5, 0)) and $y = 0$ (extended from (4.5, 0) to (6.5, 0). The three equations are used to create R vectors in the cell below, which are then plotted: 
+
+```{r}
+
+x_1 <- seq(3.5, 5.5,length.out=2000)
+y_1 <- -sqrt(1 - (x_1 - 4.5)^2) - 1
+
+x_2 <- rep(5.5, 500)
+y_2 <- seq(-1, 0, length.out=500)
+
+x_3 <- seq(4.5, 6.5, length.out=500)
+y_3 <- rep(0, 500)
+  
+  
+x_j <- c(x_1, x_2, x_3)
+y_j <- c(y_1, y_2, y_3)
+
+j_plot <- plot(y_j~x_j, xlim=c(2.5,7.5), ylim=c(-4,1))
+```
+
+As is clear from the above, plotting the equations does render a "J" (once again, it might looked squished or stretched depending on the scaling of the $x$ and $y$ axes).
+
+The cell below combines the "W" and "J" images and creates a matrix $z$ that holds all the $x$ and $y$ points used to create the image. 
+
+```{r}
+x <- c(x_w, x_j)
+y <- c(y_w, y_j)
+z <- rbind(x, y)
+
+plot(y~x, xlim=c(-1,7.5), ylim=c(-3, 1))
+```
+
+# Transforming the Image
+## Matrix Transformations
+Now that the matrix $z$ holds all the points to create the "WJ" image, we can modify it using matrix transformations. The matrices used to define these transformations are defined below:
+
+**Scale $x$**:
+$$
+P = 
+\begin{pmatrix}
+k & 0 \\
+0 & 1 
+\end{pmatrix}
+$$
+where $k$ is the $x$-scaling factor.
+
+---
+
+**Scale $y$**:
+$$
+P = 
+\begin{pmatrix}
+1 & 0 \\
+0 & k
+\end{pmatrix}
+$$
+where $k$ is the $y$-scaling factor.
+
+---
+
+**Shear $x$**:
+$$
+P = 
+\begin{pmatrix}
+1 & k \\
+0 & 1
+\end{pmatrix}
+$$
+where $k$ is the $x$-shearing factor.
+
+---
+
+**Shear $y$**:
+$$
+P = 
+\begin{pmatrix}
+1 & 0 \\
+k & 1
+\end{pmatrix}
+$$
+where $k$ is the $y$-shearing factor.
+
+---
+
+**Rotation of angle $\theta$:**
+
+$$
+P = 
+\begin{pmatrix}
+\cos{\theta} & -\sin{\theta} \\
+\sin{\theta} & \cos{\theta}
+\end{pmatrix}
+$$
+where $\theta$ is the angle of rotation in radians. 
+
+---
+
+**Projection**:
+
+Given a vector $v = \begin{pmatrix} x \\ y \end{pmatrix}$, the projection matrix $P$ that will project a given matrix $M$ onto vector $v$ is:
+
+$$
+P = \frac{vv^T}{v^Tv}
+$$
+where $v^T$ is the transpose of vector $v$. 
+
+---
+
+## Shiny Application Code
+In order to implement and visualize these transformations, they are translated into R code below used as part of a `shiny` application. This application should appear below the code cell, but if not working properly can also  be run directly from the .Rmd file by pressing the run button in the cell. 
+
+```{r}
+
+ui = shinyUI(
+  fluidPage(
+    titlePanel("Modifying an Image Using Matrix Transformations"),
+    sidebarLayout(
+      sidebarPanel(
+        h4("Enter Your Transformations  Here..."),
+        sliderInput("xscale", label = "X Scale:", 
+                    min = 0, max = 3, value = 1, step = 0.1),
+        sliderInput("yscale", label = "Y Scale:", 
+                    min = 0, max = 3, value = 1, step = 0.1),
+        sliderInput("xshear", label = "X Shear:", 
+                    min = 0, max = 3, value = 0, step = 0.1),
+        sliderInput("yshear", label = "Y Shear:", 
+                    min = 0, max = 3, value = 0, step = 0.1),
+        sliderInput("theta", label = "Rotation Angle:", 
+                    min = 0, max = 360, value = 0, step = 1),
+        sliderInput("projx", label = "Projection Vector X-Value:", 
+                    min = -10, max = 10, value = 0, step = 1),
+        sliderInput("projy", label = "Projection Vector Y-Value:", 
+                    min = -10, max = 10, value = 0, step = 1),
+        actionButton("reset", "Reset")),
+        mainPanel(h4("Visualize Your Transformations.."),
+                  plotOutput('plotOutput'))
+    )
+  )
+)
+  
+server = shinyServer( server <- function(input, output, session) { 
+    observeEvent(input$reset,{
+      updateSliderInput(session,'xscale',value = 1)
+      updateSliderInput(session,'yscale',value = 1)
+      updateSliderInput(session,'xshear',value = 0)
+      updateSliderInput(session,'yshear',value = 0)
+      updateSliderInput(session,'theta',value=0)
+      updateSliderInput(session,'projx',value=0)
+      updateSliderInput(session,'projy',value=0)
+    })
+  
+    output$plotOutput = renderPlot({
+      
+      # define transformation matrices
+        # scaling
+      x_scale_t <- matrix(0, nrow=2, ncol=2)
+      x_scale_t[2, 2] <- 1
+      x_scale_t[1, 1] <- input$xscale
+      
+      y_scale_t <- matrix(0, nrow=2, ncol=2)
+      y_scale_t[1, 1] <- 1
+      y_scale_t[2, 2] <- input$yscale
+      
+        # shear
+      x_shear_t <- matrix(1, nrow=2, ncol=2)
+      x_shear_t[2, 1] <- 0
+      x_shear_t[1, 2] <- input$xshear
+      
+      y_shear_t <- matrix(1, nrow=2, ncol=2)
+      y_shear_t[1, 2] <- 0
+      y_shear_t[2, 1] <- input$yshear
+      
+        # rotation
+      theta_t <- matrix(nrow=2, ncol=2)
+      theta_t[1, 1] <- cos((input$theta * pi) / 180)
+      theta_t[1, 2] <- -sin((input$theta * pi) / 180)
+      theta_t[2, 1] <- sin((input$theta * pi) / 180)
+      theta_t[2, 2] <- cos((input$theta * pi) / 180)
+      
+        # projection
+      if (input$projx == 0 && input$projy == 0){
+        proj_t = diag(2) 
+      }
+      else {
+        proj_vec = matrix(nrow=2, ncol=1)
+        proj_vec[1, 1] = input$projx
+        proj_vec[2, 1] = input$projy
+        proj_t = proj_vec %*% t(proj_vec)
+        k = (t(proj_vec) %*% proj_vec)[1, 1]
+        proj_t = proj_t / k
+      }
+      
+      # transform image
+      z <- x_scale_t %*% z
+      z <- y_scale_t %*% z
+      z <- x_shear_t %*% z
+      z <- y_shear_t %*% z
+      z <- theta_t %*% z
+      z <- proj_t %*% z
+      z_df <- data.frame(t(z))
+      colnames(z_df) <- c('x_vec', 'y_vec')
+      
+      # build plot
+      ggplot(data = z_df, aes(x=x_vec, y=y_vec)) +
+        geom_point() +
+        xlim(-20, 20) +
+        ylim(-20, 20) +
+        coord_fixed(ratio = 1)
+    })
+  }
+)
+  
+shinyApp(ui, server)
+```
