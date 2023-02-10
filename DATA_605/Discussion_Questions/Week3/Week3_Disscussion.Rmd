@@ -1,0 +1,117 @@
+---
+title: "Data 605 Discussion - Week 3"
+author: "William Jasmine"
+date: "2023-02-09"
+
+output:
+  html_document:
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+  pdf_document: default
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(shiny)
+```
+
+Question comes from "A First Course in Linear Algebra" by Robert A. Beezer. 
+
+# Question *T10*, Page 389
+
+**Problem Description:**
+
+A matrix $A$ is idempotent if $A^2 = A$. Show that the only possible eigenvalues of an idempotent matrix are $\lambda = 0, 1$. Then give an example of a matrix that is idempotent and has both of these two values as eigenvalues. 
+
+---
+
+**Proof:**
+
+Consider a matrix $A$ and vector $x$ such that $\mathbf{x}$ is an eigenvector of $A$ with associated eigenvalue $\lambda$. In other words:
+
+$$
+\begin{equation}
+A\mathbf{x} = \lambda\mathbf{x}
+\end{equation}
+$$
+
+Given that $A^2 = A$, we also know that:
+
+$$
+\begin{equation}
+A^2\mathbf{x} = \lambda\mathbf{x}
+\end{equation}
+$$
+
+Based off the first equation and the properties of scalar multiplication, we can modify the expression $A^2\mathbf{x}$ as follows:
+
+$$
+\begin{equation}
+A^2\mathbf{x} = A(Ax) = A(\lambda\mathbf{x}) = \lambda(A\mathbf{x}) = \lambda(\lambda\mathbf{x}) = \lambda^2\mathbf{x}
+\end{equation}
+$$
+Thus combining the result of these above three equations we have that:
+
+$$
+\begin{align}
+A\mathbf{x} &= \lambda\mathbf{x} \\
+A\mathbf{x} &= \lambda^2\mathbf{x}
+\end{align}
+$$
+
+The only way that this can be true is if $\lambda^2 = \lambda$. Thus:
+
+$$
+\begin{align}
+\lambda^2 &= \lambda \\
+\lambda^2 - \lambda &= 0 \\
+\lambda(\lambda - 1) &= 0 \\
+\end{align}
+$$
+
+The solutions to the above equation are $\lambda = 0$ and $\lambda = 1$. Thus, we conclude that is $A$ is an idempotent matrix, its only possible eigenvalues are 0 and 1. $\blacksquare$
+
+---
+
+**Example**:
+
+The following matrix $A$ is idempotent:
+
+$$
+A = 
+\begin{pmatrix}
+3 & -6 \\
+1 & -2 \\
+\end{pmatrix}
+$$
+
+This is confirmed in the code cell below:
+
+```{r}
+A <- rbind(c(3, -6), c(1, -2))
+A == A %*% A
+```
+
+To find the eigenvalues $\lambda$ of $A$, we can solve the following equation:
+
+$$
+\begin{align}
+\text{det}
+\begin{pmatrix}
+3 - \lambda & -6 \\
+1 & -2 - \lambda \\
+\end{pmatrix} &= 0 \\
+(3-\lambda)(-2-\lambda) + 6 &= \\
+\lambda^2 -3\lambda + 2\lambda - 6 + 6 &= \\
+\lambda^2 -\lambda = 0
+\end{align}
+$$
+
+We see from the above that the eigenvalues of this idempotent matrix are indeed equal to 0 and 1. The math above is confirmed via the R `eigen` function:
+
+```{r}
+round(eigen(A)[[1]])
+
+```
