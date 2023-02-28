@@ -1,0 +1,84 @@
+---
+title: "Data 605 Discussion - Week 5"
+author: "William Jasmine"
+date: "2023-02-27"
+
+output:
+  html_document:
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+  pdf_document: default
+---
+
+Question comes from ["Introduction to Probability"](https://math.dartmouth.edu/~prob/prob/prob.pdf) by Charles M. Grinstead.
+
+# Question 12, Section 5.1
+
+**Problem Description:**
+
+Prove that the values of the Poisson Distribution given by: 
+
+$$
+\begin{equation}
+P(X=k) = \frac{\lambda^k}{k!}e^{-\lambda}
+\end{equation}
+$$
+sum together to 1. 
+
+**Solution:**
+
+To solve this problem, we need simply to take the sum of $P(X=k)$ for all values of $k$ from 0 to $\infty$ ($k$ cannot be negative) and show:
+
+$$
+\begin{equation}
+\sum_{k=0}^{\infty} P(X=k) 
+= \sum_{k=0}^{\infty} \frac{\lambda^k}{k!}e^{-\lambda} = 1
+\end{equation}
+$$
+
+Thus we have (note: for clarity's sake I remove the limits of integration in the work below...): 
+
+$$
+\begin{align}
+\sum P(X=k) &= \sum\frac{\lambda^k}{k!}e^{-\lambda}  \\
+&=e^{-\lambda}\sum\frac{\lambda^k}{k!}\\
+&=e^{-\lambda}\left(\frac{\lambda^0}{0!} + \frac{\lambda^1}{1!} + \frac{\lambda^2}{2!}+ ...  \right)
+\end{align}
+$$
+
+Given that the summation expansion of $e^x$ is written as: 
+
+$$
+\begin{align}
+e^x &= \sum_{x=0}^{\infty} \frac{x^n}{n!} \\
+& = \frac{x^0}{0!} + \frac{x^1}{1!} + \frac{x^2}{2!}+ ...  
+\end{align}
+$$
+
+We conclude that:
+
+$$
+\begin{align}
+\sum_{k=0}^{\infty} P(X=k) &= e^{-\lambda}e^\lambda \\
+&= e^{-\lambda+\lambda} \\
+&=e^0 \\
+&=1
+\end{align}
+$$
+
+We can also confirm this computationally in R using different $\lambda$ values and summing to a reasonably high $k$:
+
+```{r}
+k_max <- 100
+
+for (l in 1:10){
+  tot <- 0
+  for (k in 0:k_max){ 
+    tot <- tot + (((l ** k) / factorial(k)) * exp(-l))
+  }
+  output <- paste('Using k_max =', k_max, 'and lambda =', l, ': sum =', tot)
+  print(output)
+}
+```
+

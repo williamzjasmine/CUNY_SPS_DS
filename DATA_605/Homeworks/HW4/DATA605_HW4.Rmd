@@ -1,0 +1,233 @@
+---
+title: "Data 605 HW4"
+author: "William Jasmine"
+date: "2023-02-20"
+output:
+  html_document:
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+  pdf_document: default
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(Matrix)
+library(OpenImageR)
+library(xROI)
+library(pracma)
+library(grid)
+library(FactoMineR)
+```
+
+# Purpose
+
+The goal of this document is to take a set of shoe pictures, and build eigenimagery that accounts for at least 80% of the variability seen in said pictures. Essentially, this involves computing the principal components of the combined image data and using them to transform our original images. 
+
+# Gathering Image Data
+
+The cell below sets gathers the file names, which are stored in the "shoe_pictures" directory. It also sets a single width and height that will be used in order to scale the images and ensure they are all the same size. The initial height and width of each image is 1,200 pixels and 2,500 pixels, respectively.
+
+```{r}
+height=1200;width=2500;scale=4
+scaled_w <- round(width / scale)
+scaled_h <- round(height / scale)
+mypath = "shoe_pictures/originals" #file where the images are
+files = list.files(path=mypath, pattern=".jpg$", full.names = TRUE) 
+```
+
+Being importing the image data, the cell produces a grid of all the shoe images:
+
+```{r}
+par(mfrow=c(3,3))
+par(mai=c(.3,.3,.3,.3))
+for (f in files){
+  plotJPEG(f)
+}
+```
+
+The code cell carries out a number of steps in order to collect all the image RGB data into a single matrix `img_matrix`:
+
+1. Read in the RGB image data using the `readImage()` function
+2. Break up the separate R, G, and B grids and vectorize them. 
+3. Combine the R, G, and B vectors and append them to `img_matrix`.
+
+```{r}
+img_matrix = numeric()
+
+for (f in files){
+  im = readImage(f)
+  resiz = 
+    resizeImage(im, width = scaled_w, height = scaled_h, method = 'nearest')
+  r <- as.vector(resiz[,,1])
+  g <- as.vector(resiz[,,2])
+  b <- as.vector(resiz[,,3])
+  
+  img_matrix = rbind(img_matrix, c(r,g,b))
+}
+
+img_matrix <- t(img_matrix)
+```
+
+Lastly, `img_matrix` is transposed so that the data from each column represents a single column of our matrix. In essence, the data from each image is essentially a separate variable of our dataset. Thus, our final matrix will have as many columns as there are pictures, and rows equal to three times the product of the scaled width and height. This is confirmed in the cell below:
+
+```{r}
+dim(img_matrix)[1] == scaled_h * scaled_w * 3
+dim(img_matrix)[2] == length(files)
+
+```
+
+# Scaling/Normalizing Data
+
+Because principal component analysis is extremely sensitive to having unscaled/unnormalized data, the cell below loops through each column of `img_matrix` and transforms it to have $\sigma=1$ and $\mu=0$. This is done by computing the $\sigma$ and $\mu$ of each column and transforming every element $e$ of the column into $e_T$ as follows: 
+
+$$
+\begin{equation}
+e_T = (e - \mu) / \sigma
+\end{equation}
+$$
+
+The cell carries out the above and stores the transformed data in `scale_matrix`. 
+
+```{r}
+scale_matrix <- matrix(nrow=nrow(img_matrix), ncol=ncol(img_matrix))
+sds <- c()
+mus <- c()
+for (i in 1:dim(img_matrix)[2]){
+  sd <- sd(img_matrix[,i])
+  mu <- mean(img_matrix[,i])
+  scale_matrix[,i] <- as.matrix((img_matrix[,i] - mu) / sd)
+  sds[i] <- sd
+  mus[i] <- mu
+}
+```
+
+The `sds` and `mus` vectors also save all the standard deviations and means that were used to normalize the data, as they will be required later. 
+
+# Compute Principal Components
+
+By definition, the principal components of a matrix are equal to the eigenvectors of that matrix's covariance matrix. In addition, the associated eigenvalues of each eigenvector will tell also tell us its relative importance compared to the other principal components. 
+
+The cell below computes the covariance matrix of our `scale_matrix` and stores the data in `cov_matrix`:
+
+```{r}
+cov_matrix <- cov(scale_matrix)
+```
+
+Note that for a $nxm$ matrix, the covariance matrix will always be size $mxm$. Furthermore, that means that the covariance matrix will have $m$ eigenvectors (principal components). The cell below uses the `eigen` function to compute the eigenvalues and vectors of `cov_matrix`:
+
+```{r}
+eigenvalues <- eigen(cov_matrix)$values
+eigenvectors <- eigen(cov_matrix)$vectors
+```
+
+Note that the principal components of our `scaled_matrix` are now all stored in `eigenvectors`. 
+
+# Choose Principal Components
+
+To figure out how many of these principal components account for a given percentage of the matrix's variability, we can carry out the following:
+
+1. Sort the eigenvalues from greatest to least. 
+2. Take a cumulative sum of the sorted eigenvalues and divide each by the sum of all eigenvalues (value will be between 0 and 1). 
+3. Determine at which eigenvalue we have passed our variability threshold.
+
+The cell below carries out these steps using a 80% variability threshold. 
+
+```{r}
+threshold <- 0.8
+var_explained <- cumsum(eigenvalues) / sum(eigenvalues)
+num_pcs <- length(which(var_explained < threshold)) + 1
+num_pcs
+```
+
+As is clear in the ouptut above, only 3 out of the 17 most important principal components are needed to account for more than 80% of the collective image data's variability. The cell below plots a graph that details how explained variance increases as we add principal components:
+
+```{r}
+
+plot(seq(0, length(var_explained), 1), c(0,var_explained) * 100,
+     xlab='Principal Component (Ordered by Importance)',
+     ylab='Explained Variance (%)',
+     ylim=c(0, 100),
+     xlim=c(0, length(var_explained)),
+     type='b'
+)
+```
+
+As is clear in the graph above, the importance of the principal components drastically falls off after the first few.
+
+# Principal Component Transformation
+
+Now that we know we only need to use three of our principal components to reach our desired variability threshold, we can use these components to transform our data. Principal component transformation is done by left multiplying the scaled matrix $S$ by a projection matrix $P$ of the chosen eigenvectors of $S$. This results in a $T$ that represents our PCA transformed matrix. Namely:
+
+$$
+\begin{equation}
+T = S  P
+\end{equation}
+$$
+
+Thus, if $n$ principal components are chosen ($n=3$, in our case) and the scaled matrix is size $ixj$, then $T$ will have a size $ixn$. The actual transformation is performed in the cell below:
+
+```{r}
+proj_matrix <- eigenvectors[,1:num_pcs]
+pca_matrix <- scale_matrix %*% proj_matrix
+```
+
+`pca_matrix` now holds our final, PCA transformed matrix. We have successfully reduced the number of "variables" in our data from 17 to 3 (~82% decrease!) and still have a dataset that contains more than 80% variability of the original. This kind of dimensionality reduction is especially useful in fields such as machine learning, seeing as it can drastically reduce the amount of data (and thus, time) needed to train a model. 
+
+
+# Creating Eigenshoes ("eigenimagery")
+
+Because we want to be able to see the images that are rendered by our principal components, we need to undo the scaling initially done to produce `scale_matrix`, and apply it to our newly created `pca_matrix`:
+
+```{r}
+unscale_matrix <- matrix(nrow=nrow(pca_matrix), ncol=ncol(pca_matrix))
+
+for (i in 1:dim(pca_matrix)[2]){
+  unscale_matrix[,i] <- (as.matrix(sds[i] * pca_matrix[,i])) + mus[i]
+}
+
+unscale_matrix <- round(unscale_matrix)
+
+for (i in 1:dim(unscale_matrix)[1]){
+  for(j in 1:dim(unscale_matrix)[2]){
+    if (unscale_matrix[i,j] > 255){
+      unscale_matrix[i,j] <- 255
+    }    
+    if (unscale_matrix[i,j] < 0){
+      unscale_matrix[i,j] <- 0
+    }
+  }
+}
+```
+
+Lastly, the cell below transforms each of the eigenshoe images back to have RGB values, and writes them to new files in the `shoe_pictures` directory:
+
+```{r}
+for (i in 1:dim(unscale_matrix)[2]){
+  eigenshoe_im <-
+    test <- array(unscale_matrix[,3], dim=c(scaled_w,scaled_h,3))
+
+  file_path <- paste('shoe_pictures/eigenshoes/eigenshoe', i, '.jpeg', sep='')
+  writeImage(eigenshoe_im, file_path)
+}
+
+```
+
+The cell below shows our final eigenshoes! 
+
+```{r}
+mypath <- 'shoe_pictures/eigenshoes'
+files <- list.files(path=mypath, pattern=".jpeg$", full.names = TRUE) 
+
+
+par(mfrow=c(3,3))
+par(mai=c(.3,.3,.3,.3))
+for (f in files){
+  plotJPEG(f)
+}
+```
+
+
+
+

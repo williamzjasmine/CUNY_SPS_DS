@@ -1,0 +1,466 @@
+---
+title: "Data 605 HW5"
+author: "William Jasmine"
+date: "2023-02-27"
+output:
+  html_document:
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+  pdf_document: default
+---
+
+# Problem  1 - Bayesian
+A new test for multinucleoside-resistant (MNR) human immunodeficiency virus type 1 (HIV-1) variants was recently developed. The test maintains 96% sensitivity, meaning that, for those with the disease, it will correctly report “positive” for 96% of them. The test is also 98% specific, meaning that, for those without the disease, 98% will be correctly reported as “negative.” MNR HIV-1 is considered to be rare (albeit emerging), with about a .1% or .001 prevalence rate. 
+
+---
+
+**Given the prevalence rate, sensitivity, and specificity estimates, what is the probability that an individual who is reported as positive by the new test actually has the disease?**
+
+We can define variables $A$ and $B$ such that:
+
+- $P(A) =$ The probability that an individual is positive for MNR HIV-1. 
+- $P(B) =$ The probability that an individual gets a positive result on the new MNR HIV-1 test. 
+
+Thus, the probability that an individual who is reported as positive by the new test actually has the disease is given by $P(A|B)$. From Baye's theorem we have that: 
+
+$$
+\begin{equation}
+P(A|B) = \frac{P(B|A) \cdot P(A)}{P(B)}
+\end{equation}
+$$
+In our case, $P(A)$ is equal to the prevalence rate of MNR HIV-1, which is given as 0.001. $P(B|A)$ is the probability that an individual gets a positive result on the test given that they are also positive for MNR HIV-1. This is synonynomous with the sensitivity of the test, which is given as 0.96. $P(B)$ is also known as the prior or marginal probability of $B$, and in the event that $A$ is a discrete variable can be written as follows: 
+
+$$
+\begin{equation}
+P(B) = \sum_{x\in A} P(B|x) \cdot P(x)
+\end{equation}
+$$
+
+where $x\in A$ represent each of the possible outcomes of $A$. In our case, there are only two (an individual is either positive or negative for MNR HIV-1). This we can write: 
+
+$$
+\begin{equation}
+P(B) = P(B|A^-) \cdot P(A^-) + P(B|A^+) \cdot P(A^+)
+\end{equation}
+$$
+
+Where $P(A^-)$ and $P(A^+)$ represent the probability that someone is negative or positive for MNR HIV-1, respectively. 
+
+Putting this all together we have: 
+
+$$
+\begin{equation}
+P(A^+|B) = \frac{P(B|A^+) \cdot P(A^+)}{P(B|A^-) \cdot P(A^-) + P(B|A^+) \cdot P(A^+)}
+\end{equation}
+$$
+The last unknown is $P(B|A^-)$, which is the probability that someone tests positive given that they are actually negative for MNR HIV-1. Given that we know 98% of negative patients also receive negative test results, we can conclude $P(B|A^-) = 1 - 0.98 = 0.02$. 
+
+To conclude, we plug in all our probabilities and solve:
+
+$$
+\begin{align}
+P(A^+|B) &= \frac{0.96 \cdot 0.001}{(1 - 0.98) \cdot (1-0.001) + 0.96 \cdot 0.001} \\
+P(A^+|B) &\approx 0.046
+\end{align}
+$$
+Thus, Baye's law has helped us to determine that there is about a 4.6% chance that an individual who is reported as positive by the new test actually has the disease.
+
+```{r, echo=FALSE, eval=FALSE}
+# do calculation
+(0.96 * 0.001) / ((1-0.98) * (1-0.001) + (0.96 * 0.001))
+```
+
+---
+
+**If the median cost (consider this the best point estimate) is about $100,000 per positive case total and the test itself costs \$1000 per administration, what is the total first-year cost for treating 100,000 individuals?**
+
+The total cost to treat 100,000 individuals would be the cost of testing everyone plus the cost of treating those who actually have the disease after receiving a positive test result. If $n =$ number of individuals, $c_T =$ the cost of treatment, $c_d$ is the cost of the diagnostic test, then we can write: 
+
+$$
+\begin{align}
+\text{cost} &= n \cdot c_d  + n \cdot P(B) \cdot P(A|B) \cdot c_t\\
+\text{cost} &= 100,000 \cdot1,000 + 100,000 \cdot 0.021 \cdot 0.046 \cdot 100,000\\
+\text{cost} &= 109,660,000
+\end{align}
+$$
+Thus the total cost to test and treat 100,000 individuals would be about 110 million dollars a year. Note that this calculation excludes treating those who actually have the disease after receiving a negative test result. While being an extremely unlikely outcome, more money would be required to provide additional tests and eventually more treatment for these individuals.
+
+```{r, eval=FALSE, echo=FALSE}
+(100000 * 1000) + (0.021 * 0.046 * 100000 * 100000)
+```
+
+# Problem 2 - Binomial
+The probability of your organization receiving a Joint Commission inspection in any given month is .05. 
+
+---
+
+**What is the probability that, after 24 months, you received exactly 2 inspections?**
+
+If we define $p = 0.05$ as the probability that our organization receives an inspection, then we can use the binomial distribution to determine $P(x,n,p)$ which is the probability of receiving $x$ inspections in $n$ months: 
+
+$$
+\begin{equation}
+P(x,n,p) = {n \choose x}p^x(1-p)^{n-x}
+\end{equation}
+$$
+Thus, plugging in $x=2$ and $n=24$ we have:
+
+$$
+\begin{align}
+P(2, 24, 0.05) &= {24 \choose 2}0.05^2(1-0.05)^{24-2} \\
+P(2,24, 0.05) &\approx 0.22
+\end{align}
+$$
+
+```{r, eval=FALSE, echo=FALSE}
+choose(24, 2) * (0.05 ** 2) * ((1-0.05) ** (24-2))
+```
+
+---
+
+**What is the probability that, after 24 months, you received 2 or more inspections?**
+
+We can write this as:
+
+$$
+\begin{align}
+P(x\geq2,24, 0.05) &= 1 - P(0, 24, 0.05) - P(1, 24, 0.05)\\
+&= 1 - {24 \choose 0}0.05^0(1-0.05)^{24-0} - {24 \choose 1}0.05^1(1-0.05)^{24-1}\\
+&\approx0.34
+\end{align}
+$$
+```{r, eval=FALSE, echo=FALSE}
+1 - choose(24, 0) * (0.05 ** 0) * ((1-0.05) ** (24-0)) - choose(24, 1) * (0.05 ** 1) * ((1-0.05) ** (24-1))
+```
+
+---
+
+**What is the probability that your received fewer than 2 inspections?**
+
+This is the opposite of the previous question, meaning we can simply subtract our previous result from 1:
+
+
+$$
+\begin{align}
+P(x<2,24, 0.05) &\approx 1 - 0.34\\
+&\approx0.66
+\end{align}
+$$
+---
+
+**What is the expected number of inspections you should have received in 24 months?**
+
+The expected value $E(X)$ (or $\mu$) of $x$ successes (inspections) in $n$ trials (months) from a binomial distribution is simply the number of trials times the probability of success for a single trial $p$:
+
+$$
+\begin{equation}
+E(X) = np
+\end{equation}
+$$
+
+In our case, $np = 0.05 \cdot 24 = 1.2$ inspections.
+
+---
+
+**What is the standard deviation?**
+
+The standard deviation $\sigma$ of from a binomial distribution is defined as:
+
+$$
+\begin{align}
+\sigma &= np(1-p)\\
+\sigma &= \mu(1-p)
+\end{align}
+$$
+In our case, $\mu(1-p) = 1.2 \cdot (1- 0.05) = 1.14$.
+
+# Problem 3 -  Poisson
+You are modeling the family practice clinic and notice that patients arrive at a rate of 10 per hour. 
+
+---
+
+**What is the probability that exactly 3 arrive in one hour?**
+
+The poisson distribution says that given a mean rate of success $\lambda$, we can determine the probability $P(x, \lambda)$ of $x$ successes via the following:
+
+$$
+\begin{equation}
+P(x, \lambda) = \frac{e^{-\lambda}\lambda^x}{x!}
+\end{equation}
+$$
+
+In our case a success is the arrival of a patient, and our mean success rate $\lambda$ (per unit hour) equals 10. Thus, using the above equation we have:
+
+$$
+\begin{align}
+P(3, 10) &= \frac{e^{-10}\cdot 10^3}{3!} \\
+&\approx 0.0075
+\end{align}
+$$
+```{r, eval=FALSE, echo=FALSE}
+(exp(-10) * (10**3)) / factorial(3)
+```
+
+---
+
+**What is the probability that more than 10 arrive in one hour?**
+
+This can be written as: 
+
+$$
+\begin{align}
+P(x>10, 10) &= 1 - \sum_{x=0}^{10}P(x)\\
+P(x>10, 10) &= 1 - P(0) - P(1) - ... - P(10)
+\end{align}
+$$
+
+Instead of computing each individually, the code below makes use of a loop:
+
+```{r}
+p = 1
+for(i in 0:10){
+  p = p - (exp(-10) * (10**i)) / factorial(i)
+  #p = p - dpois(i, 10) # using dpois function
+}
+print(p)
+```
+
+Thus, $P(x>10) \approx 0.42$.
+
+---
+
+**How many would you expect to arrive in 8 hours?**
+
+The expected value of a Poisson distribution is equal to $\lambda$, which in our case gives us the expected number of patients in a single hour. Thus the number of expected patients in 8 hours is simply $8\lambda = 80$ patients. 
+
+---
+
+**What is the standard deviation of the appropriate probability distribution?**
+
+Given that the variance of the Poisson distribution is also equal to $\lambda$, we can conclude that its standard deviation $\sigma = \sqrt\lambda$. Thus, in our case $\sigma = \sqrt10$. If we are considering the probability distribution of the number of expected patients over 8 hours, we would multiply this standard deviation by 8, namely $\sigma = 8\sqrt10$
+
+---
+
+**If there are three family practice providers that can see 24 templated patients each day, what is the percent utilization and what are your recommendations?**
+
+Let's say each doctor works from 9 A.M. to 6 P.M. and takes a 1 hour lunch, thus working 8 hours each day. If their capacity each is 24 patients per day, then they are working at a rate of approximately 3 per hour. Combined, they have an hourly capacity of 9 per hour, one less than the expected patient arrival rate. This means their utilization rate as a whole is greater than 100% ($10/9 \approx 111$%), which could lead to doctor burnout and unhappy patients. There are a number of steps they could take to mitigate this, such as hiring a new doctor or working to limit slightly the patient walk-in rate.
+
+# Problem 4 - Hypergeometric
+
+Your subordinate who supervises 30 workers was recently accused of favoring nurses. 15 of the subordinate’s workers are nurses and 15 are other than nurses. As evidence of malfeasance, the accuser stated that there were 6 company-paid trips to Disney World for which everyone was eligible. The supervisor sent 5 nurses and 1 non-nurse. 
+
+---
+
+**If your subordinate acted innocently, what was the probability he/she would have selected five nurses for the trips?**
+
+To solve this we can use the hypergeometric probability distribution, which describes the probability $P(x, k, N, n)$ of choosing $x$ elements from a "successful" group of size $k$ out of a total group of size $N$ in $n$ trials, without replacement (otherwise, we could just use the binomial distribution). The formula for this distribution is as follows:
+
+$$
+\begin{equation}
+P(x, k, N, n) =  \frac{{k \choose x}{N-k \choose n-x}}{N \choose n}
+\end{equation}
+$$
+In this case, our "successful" group is the nurse group, our unsuccessful group is all other workers of size $N-k=30-15=15$, and $x=5$. Thus we have:
+
+$$
+\begin{align}
+P(5, 15, 30, 6) &=  \frac{{15 \choose 5}{30-15 \choose 6-5}}{30 \choose 6}\\
+&\approx 0.076
+\end{align}
+$$
+
+Thus, if the supervisor was acting innocently, then there is only about a 7.6% chance that he would have chosen the way he did. 
+
+```{r, eval=FALSE, echo=FALSE}
+(choose(15, 5) * choose(15, 1)) / choose(30, 6)
+```
+ 
+---
+
+**How many nurses would we have expected your subordinate to send? How many non-nurses would we have expected your subordinate to send?**
+
+Given that the number of nurses and non-nurses is equal, you would expect them to send an equal number of each. In this case, since there were 6 trips, you would expect them to send 3 nurses and 3 non-nurses. 
+
+
+# Problem 5 - Geometric 
+
+The probability of being seriously injured in a car crash in an unspecified location is about .1% per hour. A driver is required to traverse this area for 1200 hours in the course of a year. 
+
+---
+
+**What is the probability that the driver will be seriously injured during the course of the year? In the course of 15 months?** 
+
+This can be solved using the geometric distribution, which tells us The geometric distribution gives the probability $P(x, p)$ that the first occurrence of success requires $x$ independent trials, each with success probability $p$. It is written as and is just the result of multiplying together independent probabilities: 
+
+$$
+\begin{equation}
+P(x, p) = (1-p)^{x-1}p
+\end{equation}
+$$
+
+In our case, $p=0.001$ and $n$ is equal to the number of hours. To determine the the probability that the driver will be seriously injured in a year's (1,200 hour's) worth of driving, we need to determine the probability that the driver will be seriously injured in any of those hours. In other words, we must solve: 
+
+$$
+\begin{equation}
+P(1\leq x\leq1200, 0.001) = \sum_{x=1}^{1,200}(1-0.001)^{x-1}\cdot0.001
+\end{equation}
+$$ 
+
+We can calculate the above sum via a loop:
+
+
+```{r}
+p <- 0
+for(i in 1:1200){
+  p <- p + (1-0.001) ** (i - 1) * 0.001
+  #p <- p + dgeom(i, 0.001) # using dgeom()
+}
+print(p)
+```
+
+Thus, the driver has about a 70% of getting into a severe accident in the first month; not great! 
+
+In 15 months, we can assume our driver will have driven 1,500 hours. Solving for $P(1\leq x\leq1500, 0.001)$ gives us:
+
+```{r}
+p <- 0
+for(i in 1:1500){
+  p <- p + (1-0.001) ** (i - 1) * 0.001
+  #p <- p + dgeom(i, 0.001) # using dgeom()
+}
+print(p)
+```
+
+meaning the probability has jumped to 77%!
+
+---
+
+**What is the expected number of hours that a driver will drive before being seriously injured?** 
+
+This can be determined by taking the ratio of the probability of success and failure. In other words, we have $\frac{1-p}{p} = \frac{0.999}{0.001} = 999$, meaning that for every hour with a collision we can expect 999 hours without one. Thus, we can expect 999 hours before a collision on the 1,000th hour. 
+
+--- 
+
+**Given that a driver has driven 1200 hours, what is the probability that he or she will be injured in the next 100 hours?**
+
+Because each the probability of getting into a crash each hour is an independent event, the fact that the driver has not crashed in the previous 1,200 hours holds no bearing on the probability of them crashing in the next 100 hours (even if you flip a fair coin 500 times and get all heads, the probability of getting tails on the next flip is still only 0.5). Thus, we need only compute $P(1\leq x\leq1200, 0.001)$:
+
+```{r}
+p <- 0
+for(i in 1:100){
+  p <- p + (1-0.001) ** (i - 1) * 0.001
+  #p <- p + dgeom(i, 0.001) # using dgeom()
+}
+print(p)
+
+```
+
+Thus, their chance of getting in a serious accident in the next 100 hours is about 9.5%. 
+
+# Problem 6
+
+You are working in a hospital that is running off of a primary generator which fails about once in 1000 hours.
+
+---
+
+**What is the probability that the generator will fail more than twice in 1000 hours?**
+
+Using the Poisson distribution:
+
+```{r}
+1 - dpois(0, 1) - dpois(1, 1)
+```
+
+---
+
+**What is the expected value?**
+
+Given we are using a Poisson distribution $E(X) = \mu = \lambda = 1$.
+
+# Problem 7
+
+A surgical patient arrives for surgery precisely at a given time. Based on previous analysis (or a lack of knowledge assumption), you know that the waiting time is uniformly distributed from 0 to 30 minutes.
+
+---
+
+**What is the probability that this patient will wait more than 10 minutes?**
+
+Given that the distribution of wait time is uniform,there is a $\frac{30-10}{30}=\frac{2}{3}$ chance the patient will wait more than 10 minutes.  
+
+--- 
+
+**If the patient has already waited 10 minutes, what is the probability that he/she will wait at least another 5 minutes prior to being seen?**
+
+The distribution of wait times is still uniform but now has a smaller range (0-20 minutes as opposed to 0-30). Thus, there is a $\frac{20-5}{20}=\frac{3}{4}$ chance that the patient will wait at least another 5 minutes before being seen. 
+
+---
+
+**What is the expected waiting time?**
+
+The expected value of a uniform distribution is its center which can be found by dividing its range of values by two: $\frac{30-0}{2} = 15$. 
+
+# Problem 8 
+
+Your hospital owns an old MRI, which has a manufacturer’s lifetime of about 10 years (expected value). Based on previous studies, we know that the failure of most MRIs obeys an exponential distribution. 
+
+---
+
+**What is the expected failure time? What is the standard deviation?**
+
+The exponential distribution is written as describes the probability $P(x,\lambda)$ of an event occurring after $x$ amount of time. It consists of a rate factor $\lambda$, which is equal to $\frac{1}{\mu}$ where $\mu$ is the average time it takes for the event to occur: 
+
+$$
+\begin{equation}
+P(x,\lambda) = 
+ \begin{cases} 
+      0, & x < 0 \\
+      \lambda e^{-\lambda x}, & x \geq0 
+   \end{cases}
+\end{equation}
+$$
+
+The expected value and standard deviation of a exponential distribution are both equal to $\frac{1}{\lambda} = \frac{1}{1/10}= 10$. 
+
+---
+
+**What is the probability that your MRI will fail after 8 years?**
+
+To determine the probability that the MRI will fail after 8 years we must compute: 
+
+
+$$
+\begin{equation}
+P(x>8,\frac{1}{10}) = 1 - \int_{x=0}^8 \frac{1}{10} e^{-\frac{1}{10} x}
+\end{equation}
+$$
+
+Note the integral as opposed to a sum, since the variable of interest in this case (failure time of the MRI) is continuous. The cell below computes the above using the R `integrate` function:
+
+```{r}
+integrand <- function(x) {.1 * exp(-.1 * x)}
+print(1 - integrate(integrand, lower = 0, upper = 8)$value)
+# Can also use the pexp() function. The below should give the same result.
+# 1-(pexp(8, 0.1))
+```
+
+
+---
+
+**Now assume that you have owned the machine for 8 years. Given that you already owned the machine 8 years, what is the probability that it will fail in the next two years?**
+
+Because the exponential distribution is "memoryless", the remaining life on the MRI machine has the same distribution as a brand new MRI machine. In other words, $P(x < t_1 | x > t_2) = 1 - P(x > t_1 - t_2)$. In this case, we wish to compute $P(x < 10 | x > 8) = 1 - P(x > 2) = P(x < 2)$ or:  
+
+$$
+\begin{equation}
+P(x<2,\frac{1}{10}) = \int_{x=0}^2 \frac{1}{10} e^{-\frac{1}{10} x}
+\end{equation}
+$$
+
+```{r}
+integrand <- function(x) {.1 * exp(-.1 * x)}
+print(integrate(integrand, lower = 0, upper = 2)$value)
+# Can also use the pexp() function. The below should give the same result.
+# 1-pexp(2, 0.1)
+```
