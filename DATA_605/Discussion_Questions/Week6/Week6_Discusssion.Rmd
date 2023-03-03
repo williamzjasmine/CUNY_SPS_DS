@@ -1,0 +1,323 @@
+---
+title: "Data 605 Discussion - Week 5"
+author: "William Jasmine"
+date: "2023-02-27"
+
+output:
+  html_document:
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+  pdf_document: default
+---
+
+Question comes from ["Introduction to Probability"](https://math.dartmouth.edu/~prob/prob/prob.pdf) by Charles M. Grinstead.
+
+# Question 13, Section 4.2
+
+## Problem Description:
+
+Write a program to allow you to compare the strategies play-the-winner and play-the-best-machine for the two-armed bandit problem of Example 4.24. Have your program determine the initial payoff probabilities for each machine by choosing a pair of random numbers between 0 and 1. Have your program carry out 20 plays and keep track of the number of wins for each of the two strategies. Finally, have your program make 1000 repetitions of the 20 plays and compute the average winning per 20 plays. Which strategy seems to be the best? Repeat these simulations with 20 replaced by 100. Does your answer to the above question change?
+
+--- 
+
+**For context, here is the text from example 4.24:**
+
+You are in a casino and confronted by two slot machines. Each machine pays off either 1 dollar or nothing. The probability that the first machine pays off a dollar is $x$ and that the second machine pays off a dollar is $y$. We assume that x and y are random numbers chosen independently from the interval [0, 1] and unknown to you. You are permitted to make a series of ten plays, each time choosing one machine or the other. How should you choose to maximize the number of times that you win? One strategy that sounds reasonable is to calculate, at every stage, the probability that each machine will pay off and choose the machine with the higher probability. Let $win(i)$, for $i = 1$ or 2, be the number of times that you have won on the ith machine. Similarly, let $lose(i)$ be the number of times you have lost on the $i$th machine. Then, from Example 4.23, the probability $p(i)$ that you win if you choose the $i$th machine is
+
+$$
+p(i) = \frac{win(i) + 1}{win(i) + lose(i) + 2}
+$$.
+
+Thus, if $p(1) > p(2)$ you would play machine 1 and otherwise you would play machine 2. We have written a program **TwoArm** to simulate this experiment. Inthe program, the user specifies the initial values for $x$ and $y$ (but these are unknown to the experimenter). The program calculates at each stage the two conditional densities for $x$ and $y$, given the outcomes of the previous trials, and then computes $p(i)$, for $i = 1, 2$. It then chooses the machine with the highest value for the probability of winning for the next play. The program prints the machine chosen on each play and the outcome of this play. It also plots the new densities for x (solid line) and y (dotted line), showing only the current densities. We have run the program for ten plays for the case $x$ = .6 and $y$ = .7. The run of the program shows the weakness of this strategy. Our initial probability for winning on the better of the two machines is .7. We start with the poorer machine and our outcomes are such that we always have a probability greater than .6 of winning and so we just keep playing this machine even though the other machine is better. If we had lost on the first play we would have switched machines. Our final density for $y$ is the same as our initial density, namely, the uniform density. Our final density for $x$ is different and reflects a much more accurate knowledge about $x$. The computer did pretty well with this strategy, winning seven out of the ten trials, but ten trials are not enough to judge whether this is a good strategy in the long run. 
+
+Another popular strategy is the play-the-winner strategy. As the name suggests, for this strategy we choose the same machine when we win and switch machines when we lose. The program **TwoArm** will simulate this strategy as well. In Figure 4.11, we show the results of running this program with the play-the-winner strategy and the same true probabilities of .6 and .7 for the two machines. After ten plays our densities for the unknown probabilities of winning suggest to us that the second machine is indeed the better of the two. We again won seven out of trials.
+
+## Solution
+
+The cell below defines the necessary input parameters to run the simulations.
+
+```{r}
+library(ggplot2)
+seed <- 100
+set.seed(seed)
+
+p_1 <- runif(1) # randomly choose the probability you win in slot machine 1
+p_2 <- runif(1) # randomly choose the probability you win in slot machine 2.
+trials <- 20
+sims <- 1000
+```
+
+The cell below creates functions that can be used to simulate the play-the-best-machine and play-last-winner strategies in the two-arm problem (`run_plbm()` and `run_plw()`, respectively. It also defines a class `SlotsResults` that can be used to hold the results of each function, telling us the outcomes, probabilities, and machines used in during each run. 
+
+```{r}
+setClass(Class='SlotResults',
+         representation(
+            outcomes="character",
+            machines_used="numeric",
+            P1s="numeric",
+            P2s="numeric"
+          )
+)
+
+
+# -------------------------------------------------
+
+
+run_slot <- function(p_winning){
+  return(sample(c('win', 'lose'), size=1, prob=c(p_winning, 1-p_winning)))
+}
+
+plbm_prob <- function(wins, loses){
+  return((wins + 1) / (wins + loses + 2))
+}
+
+
+# -------------------------------------------------
+
+
+run_plbm <- function(p_winning1, p_winning2, n) {
+  machines_used <- c()
+  outcomes <- c()
+  wins_1 <- 0
+  loses_1 <- 0
+  wins_2 <- 0 
+  loses_2 <- 0
+  P1s <- c()
+  P2s <- c()
+  
+  for (i in 1:n){
+    P1 <- plbm_prob(wins_1, loses_1)
+    P2 <- plbm_prob(wins_2, loses_2)
+    P1s <- c(P1s, P1)
+    P2s <- c(P2s, P2)
+
+    if (P1 >= P2){
+      outcome <- run_slot(p_winning1)
+      machines_used <- c(machines_used, 1)
+      if (outcome == 'win') {
+        wins_1 <- wins_1 + 1
+      }
+      else {
+        loses_1 <- loses_1 + 1
+      }
+    }
+    else {
+      outcome <- run_slot(p_winning2)
+      machines_used <- c(machines_used, 2)
+
+      if (outcome == 'win') {
+        wins_2 <- wins_2 + 1
+      }
+      else {
+        loses_2 <- loses_2 + 1
+      }
+    }
+    outcomes <- c(outcomes, outcome)
+  }
+  return(new("SlotResults",
+             outcomes=outcomes,
+             machines_used=machines_used,
+             P1s=P1s,
+             P2s=P2s
+  ))
+}
+
+
+# -------------------------------------------------
+  
+
+run_plw <- function(p_winning1, p_winning2, n){
+  machines_used <- c()
+  outcomes <- c()
+  wins_1 <- 0
+  loses_1 <- 0
+  wins_2 <- 0 
+  loses_2 <- 0
+  P1s <- c(0.5)
+  P2s <- c(0.5)
+  trial1_machine <- sample(c(1, 2), 1)
+  
+  if (trial1_machine == 1){
+    machines_used <- c(machines_used, 1)
+    outcome <- run_slot(p_winning1)
+    if (outcome == 'win'){
+      wins_1 <- wins_1 + 1
+    }
+    else {
+      loses_1 <- loses_1 + 1
+    }
+  }
+  else {
+    machines_used <- c(machines_used, 2)
+    outcome <- run_slot(p_winning2)
+    if (outcome == 'win'){
+      wins_2 <- wins_2 + 1
+    }
+    else {
+      loses_2 <- loses_2 + 1
+    }
+  }
+  outcomes <- c(outcomes, outcome)
+
+  
+  for (i in 2:n){
+    P1 <- plbm_prob(wins_1, loses_1)
+    P2 <- plbm_prob(wins_2, loses_2)
+    P1s <- c(P1s, P1)
+    P2s <- c(P2s, P2)
+
+    if (outcomes[i-1] == 'win'){
+      machines_used <- c(machines_used, machines_used[i-1])
+      if (machines_used[i] == 1){
+        outcome <- run_slot(p_winning1)
+        if (outcome == 'win'){
+          wins_1 <- wins_1 + 1
+        }
+        else {
+          loses_1 <- loses_1 + 1
+        }
+      }
+      else {
+        outcome <- run_slot(p_winning2)
+        if (outcome == 'win'){
+          wins_2 <- wins_2 + 1
+        }
+        else {
+          loses_2 <- loses_2 + 1
+        }
+      }
+    }
+    
+    else {
+      machines_used <- c(machines_used, machines_used[i-1])
+      if (machines_used[i-1] == 1){
+        machines_used <- c(machines_used, 2)
+      }
+      else {
+        machines_used <- c(machines_used, 1)
+      }
+      
+      if (machines_used[i] == 1){
+        outcome <- run_slot(p_winning1)
+        if (outcome == 'win'){
+          wins_1 <- wins_1 + 1
+        }
+        else {
+          loses_1 <- loses_1 + 1
+        }
+      }
+      else {
+        outcome <- run_slot(p_winning2)
+        if (outcome == 'win'){
+          wins_2 <- wins_2 + 1
+        }
+        else {
+          loses_2 <- loses_2 + 1
+        }
+      }
+    }
+    outcomes <- c(outcomes, outcome)
+  }
+  return(new("SlotResults",
+             outcomes=outcomes,
+             machines_used=machines_used,
+             P1s=P1s,
+             P2s=P2s
+  ))
+}
+```
+
+The cell below runs the functions created above for 1,000 simulations of 20 trials each, and stores how many wins each strategy produced.
+
+```{r}
+set.seed(seed)
+times_won_plbm <- c()
+times_won_plw <- c()
+
+for (i in 1:sims){
+  plbm_results <- run_plbm(p_1, p_2, trials)
+  plw_results <- run_plw(p_1, p_2, trials)
+  
+  if (length(which(plbm_results@outcomes == 'win')) == 0){
+    times_won_plbm[i] = 0
+  }
+  else{
+    times_won_plbm[i] <- length(which(plbm_results@outcomes == 'win'))
+
+  }
+  
+  if (length(which(plw_results@outcomes == 'win')) == 0){
+    times_won_plw[i] = 0
+  }
+  else{
+    times_won_plw[i] <- length(which(plw_results@outcomes == 'win'))
+  }
+}
+```
+
+We can see from this histograms that the two strategies produced pretty similar results: 
+
+```{r}
+
+plot_data <- data.frame(
+  sim_type=c(rep('PLBM', sims), rep('PLW', sims)), 
+  sim_wins=c(times_won_plbm, times_won_plw) 
+)
+
+ggplot(plot_data, aes(x=sim_wins, fill=sim_type)) +
+  geom_histogram(alpha=0.5, position = 'identity', binwidth = 1) +
+  xlim(0, trials)
+```
+
+And that it was the PLW method which won more on average (but only slightly):
+
+
+```{r}
+s1 <- paste('Slot machine 1 win probability:', p_1)
+s2 <- paste('Slot machine 2 win probability:', p_2)
+
+s3 <- paste('PLBM: ', sum(times_won_plbm)/sims, '/', trials, 'wins on average')
+s4 <- paste('PLW: ', sum(times_won_plw)/sims, '/', trials, 'wins on average')
+
+writeLines(paste(s1, s2, s3, s4, sep='\n'))
+```
+
+If we run again so that each simulation has 100 trials:
+
+```{r}
+set.seed(seed)
+times_won_plbm <- c()
+times_won_plw <- c()
+trials <- 100
+
+for (i in 1:sims){
+  plbm_results <- run_plbm(p_1, p_2, trials)
+  plw_results <- run_plw(p_1, p_2, trials)
+  
+  if (length(which(plbm_results@outcomes == 'win')) == 0){
+    times_won_plbm[i] = 0
+  }
+  else{
+    times_won_plbm[i] <- length(which(plbm_results@outcomes == 'win'))
+
+  }
+  
+  if (length(which(plw_results@outcomes == 'win')) == 0){
+    times_won_plw[i] = 0
+  }
+  else{
+    times_won_plw[i] <- length(which(plw_results@outcomes == 'win'))
+  }
+}
+
+s1 <- paste('Slot machine 1 win probability:', p_1)
+s2 <- paste('Slot machine 2 win probability:', p_2)
+
+s3 <- paste('PLBM: ', sum(times_won_plbm)/sims, '/', trials, 'wins on average')
+s4 <- paste('PLW: ', sum(times_won_plw)/sims, '/', trials, 'wins on average')
+
+writeLines(paste(s1, s2, s3, s4, sep='\n'))
+```
+
+We see that now the PLBM methodology now has a greater win percentage, which is likely due to the conditional probabilities being refined as the number of trials increases. 
