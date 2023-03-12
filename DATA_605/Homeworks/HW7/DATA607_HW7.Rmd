@@ -1,0 +1,228 @@
+---
+title: "Data 605 HW7"
+author: "William Jasmine"
+date: "2023-03-08"
+output:
+  html_document:
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+  pdf_document: default
+---
+
+```{r}
+library(ggplot2)
+
+```
+
+# Question 1
+
+**Description:**
+
+Let $X_1, X_2,..., X_n$ be n mutually independent random variables, each of
+which is uniformly distributed on the integers from 1 to $k$. Let $Y$ denote the minimum of the $X_i$’s. Find the distribution of $Y$.
+
+**Solution:**
+
+There are $k$ possible outcomes for each of the random variables $X_i$s. Thus, the number of ways we can assign values to each of them is: 
+
+$$
+\sum_{i=1}^n k = k^n
+$$
+
+Let's say now that the minimum of each $X_i$ is 1, i.e $Y$=1. The number of ways this can happen will then be the total number of outcomes minus the number of ways in which all the of the $X_i$s are greater than 1. Mathematically, this would be equivalent to $k^n - (k-1)^n$, where the $(k-1)^n$ term represents all the outcomes in which none of the $X_is$ are equal to 1. Similarly, if $Y=2$, the number of possible outcomes is $k^n - (k-2)^n - (k^n - (k-1)^n)$ where $(k-2)^n$ represents all the outcomes in which none of the $X_is$ are equal to 2. Continuing this pattern we see that in general, the number of outcomes in which $Y=j$ is: $(k−j+1)^n−(k−j)^n$. Thus, for a given $Y$, the probability $P(Y)$ is equal to
+
+$$
+P(Y) = \frac{(k−j+1)^n−(k−j)^n}{k^n}
+$$
+
+In order to test the above probability distribution, the code below simulates the the described experiment 10,000 times where $k=n=5$. This produces a computational probability distribution for $Y$, that can be compared to our hypothetical one above. 
+
+```{r}
+trials <- 10000
+n <- 5
+k <- 5
+xs <- seq(1, k)
+Ys <- c()
+Ps <- c()
+Ps_expected <- c()
+
+for (i in 1:trials){
+  xis = sample(1:k, size=n,replace=TRUE)
+  Y <- min(xis)
+  Ys[i] = Y
+  for (j in 1:k){
+    Ps[j] <- length(which(Ys == j)) / 10000
+    Ps_expected[j] <- (((k - j + 1) ** n) - ((k - j) ** n)) / (k ** n)
+  }
+}
+
+plt_data <- data.frame(xs, Ps, Ps_expected)
+plt_data
+```
+
+We see from the above that the computational probabilities are quite close to what our equation for $P(Y)$ predicts. They are plotted together below:
+
+```{r}
+ggplot(data = plt_data) +
+  geom_point(aes(x=xs, y=Ps), color='blue') +
+  geom_line(aes(x=xs, y=Ps_expected), color='red') +
+  xlab("Possible Values (1-k)") +
+  ylab("Probability Values P(Y)") 
+```
+
+# Question 2
+
+**Description:** Your organization owns a copier (future lawyers, etc.) or MRI (future doctors). This machine has a manufacturer’s expected lifetime of 10 years. This means that we expect one failure every ten years. What is the probability that the machine will fail after 8 years?
+
+## Model as a Geometric Distribution
+
+To model as a geometric, we can use the fact that we expect the MRI machine to fail after 10 years. The expectation value for a geometric distribution is given as $E(X) = \frac{1}{p}$. Plugging in, we see that we can model this situation as using a geometric model in which $p$=0.1.
+
+The geometric distribution gives the probability $P(x, p)$ that the first occurrence of success requires $x$ independent trials, each with success probability $p$. It is written as and is just the result of multiplying together independent probabilities: 
+
+$$
+\begin{equation}
+P(x, p) = (1-p)^{x-1}p
+\end{equation}
+$$
+
+Thus, in this case the probability that the machine fails after 8 years is equal to 1 minus the probability that it fails in the first 8 years:
+
+$$
+\begin{align}
+P(x > 8, p) &= 1 - \sum_{x=1}^8 (1-p)^{x-1}p \\
+P(x > 8, 0.1) &= 1 - \sum_{x=1}^8 (1-0.1)^{x-1}(0.1) \\
+P(x > 8, 0.1) &\approx 0.43
+\end{align}
+$$
+
+The code to actually produce the answer shown above is provided below:
+
+```{r}
+#P <- pgeom(7, 0.1) # also works, no need for loop
+p <- 0.1
+p_geom <- 0
+
+for (i in 1:8){
+  tmp = ((1 - p)^(i-1))*p
+  # tmp = dgeom(i-1, p) # also works
+  p_geom <- p_geom + tmp
+}
+
+p_geom <- 1 - p_geom
+p_geom
+```
+
+The standard deviation of a geometric distribution can be given by $\sigma = \frac{\sqrt{(1-p)}}{p}$. In this case, we have $\sigma = \frac{\sqrt{0.9}}{0.1} = 9.486833$.
+
+## Model as an Exponential Distribution
+
+To model as a exponential, we can use the fact that we expect the MRI machine to fail after 10 years. The expectation value for an exponential distribution is given as $E(X) = \frac{1}{\lambda}$. Plugging in, we see that we can model this situation as using a geometric model in which $\lambda$=0.1.
+
+The exponential distribution is written as describes the probability $P(x,\lambda)$ of an event occurring after $x$ amount of time. It consists of a rate factor $\lambda$, which is equal to $\frac{1}{\mu}$ where $\mu$ is the average time it takes for the event to occur: 
+
+$$
+\begin{equation}
+P(x,\lambda) = 
+ \begin{cases} 
+      0, & x < 0 \\
+      \lambda e^{-\lambda x}, & x \geq0 
+   \end{cases}
+\end{equation}
+$$
+
+To determine the probability that the MRI will fail after 8 years we must compute: 
+
+$$
+\begin{align}
+P(x>8,\frac{1}{10}) &= 1 - \int_{x=0}^8 \frac{1}{10} e^{-\frac{1}{10} x} \\
+P(x>8,\frac{1}{10}) &\approx 0.45
+\end{align}
+$$
+
+Note the integral as opposed to a sum, since the variable of interest in this case (failure time of the MRI) is continuous. The cell below computes the above using the R `integrate` function:
+
+```{r}
+# pexp(8, 0.1, lower.tail = FALSE) # should give the same result
+integrand <- function(x) {.1 * exp(-.1 * x)}
+p_exp <- 1 - integrate(integrand, lower = 0, upper = 8)$value
+p_exp
+```
+
+The standard deviation of a exponential distribution is equal to $\lambda=0.1$.
+
+## Model as an Binomial Distribution
+
+To model as a binomial, we can use assume that that probability of the machine failing each year is $p$, and that we receive 0 failures in 8 years. The expectation value of a binomial distribution is given as $E(X) = np$, and since we know that we expect the machine to fail once in 10 years, we can plug in to determine that $1 = 10 \cdot p \Rightarrow p =\frac{1}{10}$. 
+
+We can use the binomial distribution to determine $P(x,n,p)$ which is the probability of receiving $x$ failures in $n$ years: 
+
+$$
+\begin{equation}
+P(x,n,p) = {n \choose x}p^x(1-p)^{n-x}
+\end{equation}
+$$
+
+Thus, plugging in $x=0$ and $n=8$ we have:
+
+$$
+\begin{align}
+P(0, 8, 0.1) &= {8 \choose 0}0.1^0(1-0.1)^{8-0} \\
+P(0, 8, 0.1) &\approx 0.43
+\end{align}
+$$
+
+The value above is determined using R in the cell below:
+
+```{r}
+# pbinom(0, 8, 0.1) # will give the same answer
+p_binom <- choose(8, 0) * (0.1 ** 0) * ((1-0.1) ** (8-0))
+p_binom
+```
+
+The standard deviation of a binomial distribution is given as $\sigma = \sqrt{np(1-p)} \approx 0.85$.
+
+## Model as a Poisson
+
+To model as a poisson, we can assume that the mean rate of failure is 1 MRI every 10 years. This means we would expect 0.8 machines to fail every 8 years.
+
+The poisson distribution says that given a mean rate of success (or in this case, failure) $\lambda$, we can determine the probability $P(x, \lambda)$ of $x$ successes via the following:
+
+$$
+\begin{equation}
+P(x, \lambda) = \frac{e^{-\lambda}\lambda^x}{x!}
+\end{equation}
+$$
+
+If we are looking for the probability that 0 machines fail every 8 years, then we can plug in the following:
+
+In our case a success is the arrival of a patient, and our mean success rate $\lambda$ (per unit hour) equals 10. Thus, using the above equation we have:
+
+$$
+\begin{align}
+P(0, 0.8) &= \frac{e^{-0.8}\cdot 10^0}{0!} \\
+&\approx 0.45
+\end{align}
+$$
+
+The value above is determined using R in the cell below:
+
+```{r}
+# ppois(0, 0.8) # will provide the same answer 
+p_pois <- (exp(-0.8) * (10**0)) / factorial(0)
+p_pois
+```
+
+The standard deviation of a poisson distribution is given as $\sigma=\sqrt{\lambda}=\sqrt{0.8}\approx 0.89$.
+
+## Summary
+
+The following table summarizes the result from each modelling methodology to answer the question, what is the probability that the machine will fail after 8 years?
+
+```{r}
+models <- c('Geometric', 'Binomial', 'Exponential', 'Poisson')
+probs <- c(p_geom, p_binom, p_exp, p_pois)
+data.frame(models, probs)
+```

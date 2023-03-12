@@ -1,0 +1,278 @@
+---
+title: "Data 605 HW6"
+author: "William Jasmine"
+date: "2023-03-03"
+output:
+  html_document:
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+  pdf_document: default
+---
+
+# Question 1
+
+**Description:**
+
+A bag contains 5 green and 7 red jellybeans. How many ways can 5 jellybeans be withdrawn from the bag so that the number of green ones withdrawn will be less than 2?
+
+**Solution:**
+
+There are two possible scenarios to consider:
+
+1. No green (five red) jellybeans are chosen
+2. One green and four jellybeans are chosen.
+
+We can figure out the number of possibilities for each using combinations:
+
+$$
+\begin{align}
+\text{scenario 1} &= {5 \choose 0} \cdot {7 \choose 5}\\
+\text{scenario 2} &= {5 \choose 1} \cdot {7 \choose 4}
+\end{align}
+$$
+
+To get the number of  ways $n$ we can choose 5 jellybeans from the bag such that less than 2 of the jellybeans are green we simply sum the possibilities from the scenarios above:
+
+$$
+\begin{align}
+n &= {5 \choose 0} \cdot {7 \choose 5} + {5 \choose 1} \cdot {7 \choose 4} \\
+n &= 196
+\end{align}
+$$
+
+```{r}
+choose(5, 0 ) * choose(7, 5) + choose(5, 1) * choose(7, 4)
+```
+
+
+# Question 2
+
+**Description:**
+
+A certain congressional committee consists of 14 senators and 13 representatives. How many ways can a subcommittee of 5 be formed if at least 4 of the members must be representatives?
+
+**Solution:**
+
+There are two possible scenarios to consider:
+
+1. All members of the subcommittee are representatives (5 reps, 0 senators).
+2. Four members of the subcommittee are representatives, and one is a senator.
+
+We can figure out the number of possibilities for each using combinations:
+
+$$
+\begin{align}
+\text{scenario 1} &= {13 \choose 5} \cdot {14 \choose 0}\\
+\text{scenario 2} &= {13 \choose 4} \cdot {14 \choose 1}
+\end{align}
+$$
+
+To get the number of  ways $n$ we can choose a subcommittee of five members such that at least four of the members are representatives is we simply sum the possibilities from the scenarios above:
+
+$$
+\begin{align}
+n &= {13 \choose 5} \cdot {14 \choose0} + 
+{13 \choose 4} \cdot {14 \choose 1} \\
+n &= 11,297
+\end{align}
+$$
+
+```{r}
+choose(13, 5) * choose(14, 0) + choose(13, 4) * choose(14, 1)
+```
+
+# Question 3
+
+**Description:**
+
+If a coin is tossed 5 times, and then a standard six-sided die is rolled 2 times, and finally a group of three cards are drawn from a standard deck of 52 cards without replacement, how many different outcomes are possible?
+
+**Solution:**
+
+Since we are talking about independent events, we can consider the number of outcomes from each separately:
+
+- Number of outcomes after flipping a coin 5 times = $2 \cdot 2 \cdot 2 \cdot 2 \cdot 2 = 2^5$.
+- Number of outcomes after rolling a six-sided die twice = $6 \cdot 6 = 6^2.$ 
+- Number of outcomes after choosing three cards from a deck of 52, without replacement: $52 \cdot 51 \cdot 50 = {52 \choose 3} \cdot \frac{1}{3!}=\sideset{_{52}}{}P_3$
+
+The total number of outcomes $n$ is then simply the product of the above:
+
+$$
+\begin{align}
+n &= 2^5 \cdot 6^2 \cdot _{52}P_3 \\
+n &= 152,755,200
+\end{align}
+$$
+
+```{r}
+perm <- function(n, k) {
+  factorial(n) / factorial(n-k)
+}
+2 ** 5 * 6 ** 2 * perm(52, 3)
+
+```
+
+# Question 4
+
+**Description:**
+
+3 cards are drawn from a standard deck without replacement. What is the probability that at least one of the cards drawn is a 3? Express your answer as a fraction or a decimal number rounded to four decimal places.
+
+**Solution:**
+
+This question is the inverse of asking, what is the probability you get no 3s after drawing three cards from a deck, without replacement. This probability is easier to determine, and can be done via the following: $\frac{48}{52} \cdot \frac{47}{51} \cdot \frac{46}{50}$.
+
+Thus, the probability $p$ of getting at least one 3 after three draws is:
+
+$$
+\begin{align}
+p &= 1 - \left(\frac{48}{52} \cdot \frac{47}{51} \cdot \frac{46}{50}\right) \\
+p &\approx 0.217
+\end{align}
+$$
+
+```{r}
+1 - (48/52) * (47/51) * (46/50)
+```
+
+# Question 5 
+
+**Description:**
+
+Lorenzo is picking out some movies to rent, and he is primarily interested in documentaries and mysteries. He has narrowed down his selections to 17 documentaries and 14 mysteries.
+
+a. How many different combinations of 5 movies can he rent?
+b. How many different combinations of 5 movies can he rent if he wants at least one mystery?
+
+**Solution:**
+
+For part a, we simply find the number of ways you can choose 5 movies from a total of 31: ${31 \choose 5} = 169,911$.
+
+For part b, we can first find the number of combinations if he picks no mysteries (the inverse of the question asked). This is easy to calculate, as then mysteries can be ignored and we only focus on the documentaries: ${17 \choose 5} = 6,188$. The number of different combinations of five movies in which at least one of them is a mystery is then this value subtracted from the total number of combinations that were calculated in part a: $169,911-6,188 = 163,723$. 
+
+# Question 6
+
+**Description:**
+
+In choosing what music to play at a charity fund raising event, Cory needs to have an equal number of symphonies from Brahms, Haydn, and Mendelssohn. If he is setting up a schedule of the 9 symphonies to be played, and he has 4 Brahms, 104 Haydn, and 17 Mendelssohn symphonies from which to choose, how many different schedules are possible? Express your answer in scientific notation rounding to the hundredths place.
+
+**Solution:**
+
+First, we must calculate the number of ways he can choose $9/3=3$ symphonies from each composer:
+
+- From Brahms: $4 \choose 3$.
+- From Haydn: $104 \choose 3$.
+- From Mendelssohn: $14 \choose 4$.
+
+The number of ways $k$ he can pick three symphonies from each composer is then the product of the above three combinations. However, in determining the schedule for the nine symphonies, there are $9!$ possible ways in which they can be ordered. Thus, the total number of schedules possible $n$ is: 
+
+$$
+\begin{align}
+n &= {4 \choose 3} \cdot {104 \choose 3} \cdot {14 \choose 4} \cdot 9! \\
+n &= 2.65\cdot10^{14}
+\end{align} 
+$$
+
+```{r}
+choose(4, 3) * choose(104, 3) * choose(14, 4) * factorial(9)
+```
+
+# Question 7
+
+**Description:**
+
+An English teacher needs to pick 13 books to put on his reading list for the next school year, and he needs to plan the order in which they should be read. He has narrowed down his choices to 6 novels, 6 plays, 7 poetry books, and 5 nonfiction books.
+
+a. If he wants to include no more than 4 nonfiction books, how many different
+reading schedules are possible? Express your answer in scientific notation rounding to the hundredths place.
+
+b. If he wants to include all 6 plays, how many different reading schedules are possible? Express your answer in scientific notation rounding to the hundredths place.
+
+**Solution (Part a):** 
+
+The solution is much easier to determine if we first consider the inverse of the question at hand: what is the number of reading lists that can be created if five out of the thirteen books chosen are nonfiction books? Since there are only five nonfiction books to choose from, this is equal to the number of ways we can choose the remaining eight books, multiplied by the number of ways they can be ordered: ${19 \choose 8} \cdot 13!$.
+
+Given that the total number of lists possible is ${24 \choose 13} \cdot 13!$, the number of lists $n$ of 13 reading books in which at most four of them are non-fiction is:
+
+$$
+\begin{align}
+n &= \left({24 \choose 13} \cdot 13!)\right) - \left({19 \choose 8} \cdot 13!\right) \\
+n &= 13! \left({24 \choose 13} - {19 \choose 8}\right)\\
+n &\approx 1.51\cdot10^{16}
+\end{align}
+$$
+
+```{r}
+factorial(13) * (choose(24,13) - choose(19,8))
+```
+
+**Solution (Part b):** 
+
+Since there is only one way to choose all 6 out of 6 plays, this question is equivalent to asking what the number of possible ways there are to choose all the other books (multiplied by the way they can be ordered): ${18 \choose 7} * 13! \approx 1.98 \cdot 10^{14}$. 
+
+```{r}
+choose(18, 7) * factorial(13)
+```
+
+
+# Question 8 
+
+**Description:**
+
+Zane is planting trees along his driveway, and he has 5 sycamores and 5 cypress trees to plant in one row. What is the probability that he randomly plants the trees so that all 5 sycamores are next to each other and all 5 cypress trees are next to each other? Express your answer as a fraction or a decimal number rounded to four decimal places.
+
+**Solution:**
+
+The choice of the first tree doesn't matter and can be either sycamore or cypress. However, in order for all 5 sycamore and all 5 cypress to be next to each other, the 2nd, 3rd, 4th, and 5th trees planted all must match the first. Once this condition is met, it must also be the case that trees 6 through 10 are all the same as well. Thus, the probability $p$ that the 2nd, 3rd, 4th, and 5th trees match the first is: 
+
+$$
+\begin{align}
+p &= \frac{4}{9} \cdot \frac{3}{8} \cdot \frac{2}{7}\cdot \frac{1}{6} \\
+p &\approx .008
+\end{align}
+$$
+
+```{r}
+(4/9) * (3/8) * (2/7) * (1/6)
+```
+
+# Question 9
+
+**Description:**
+
+If you draw a queen or lower from a standard deck of cards, I will pay you \$4. If not, you pay me \$16. (Aces are considered the highest card in the deck.)
+
+a. Find the expected value of the proposition. Round your answer to two decimal places. Losses must be expressed as negative values.
+
+b. If you played this game 833 times how much would you expect to win or lose? Round your answer to two decimal places. Losses must be expressed as negative
+values.
+
+**Solution:**
+
+The expected value of a random event $X$ $E(X)$ is defined as the sum of the outcomes $x$ of $X$ multiplied by each outcome's respective probability $p_x$:
+
+$$
+E(X) = \sum_{x \in X} x \cdot p_x
+$$
+
+In our case, this evaluates to:
+
+$$
+\begin{align}
+E(X) &=  4 \cdot \frac{44}{52} + (-16) \cdot \frac{8}{52} \\
+&\approx 0.92
+\end{align}
+$$
+
+This means that, on average, I will win about $0.92 each time I play (meaning this is a game I should happily participate in).
+
+
+If I play this game 833 times, I should expect to make $E(X) \cdot 833 \approx \$768.92$
+
+```{r}
+ex <- (4 * (44/52)) - (16 * (8/52)) 
+print(ex)
+ex * 833
+```
