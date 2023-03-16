@@ -1,0 +1,24 @@
+---
+title: "Data 605 Discussion Response - Week 7"
+author: "William Jasmine"
+date: "2023-03-12"
+
+output:
+  html_document:
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+  pdf_document: default
+---
+
+Question comes from ["Introduction to Probability"](https://math.dartmouth.edu/~prob/prob/prob.pdf) by Charles M. Grinstead.
+
+# Question 3, Section 5.1
+## Problem Description:
+
+Let $X$ be a random variable which can take on countably many values. Show
+that $X$ cannot be uniformly distributed.
+
+## Solution
+
+Assume that the set of values $V$ that $X$ can take on is countably infinite, and that $X$ is uniformly distributed. Thus, it must be the case that there is some $p$ > 0 such that $P(X=v) = a$ for all $v\in V$. Furthermore, it must be the case that $\sum_{v\in V} a = 1$. However, since $V$ is infinite in size, and $p>0$, $\sum_{v\in V} a = \infty$. Thus, we have a contradiction and show that $X$ cannot be uniformly distributed. 
