@@ -1,0 +1,69 @@
+---
+title: "Data 605 Discussion - Week 8 Discussion Response"
+author: "William Jasmine"
+date: "2023-03-16"
+
+output:
+  html_document:
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+  pdf_document: default
+---
+
+Question comes from ["Introduction to Probability"](https://math.dartmouth.edu/~prob/prob/prob.pdf) by Charles M. Grinstead.
+
+# Question 3a, Section 7.2
+## Problem Description:
+
+Let $X$ and $Y$ be independent random variables with:
+
+$$
+\begin{equation}
+f_X(x) = f_Y(x) =     
+  \begin{cases}
+        \frac{x}{2} & \text{if } 0 < x < 2\\
+        0 & \text{otherwise }
+  \end{cases}
+\end{equation}
+$$
+
+Suppose that $Z = X + Y$. Find $f_Z$.
+
+## Solution 
+
+To sample the PDF distribution $f_X(x)$ we can pick random numbers from a uniform distribution between 0 and 1 and see when those values are equal to $F_X(x)$ (the CDF of $X$). First, we evaluate $F_X(x)$: 
+
+
+$$
+\begin{align}
+F_X(x) &= \int_{-\infty}^x f_X(x) dx \\
+F_X(x) &= \int_{0}^x\frac{x}{2} dx \\
+F_X(x) &= \frac{x^2}{4}
+\end{align}
+$$
+
+Thus, to perform our sampling, given a random number $r$ from our uniform distribution from 0 to 1: 
+
+$$
+\begin{align}
+F_X(x) &= r \\
+\frac{x^2}{4} &= r \\
+x &= \sqrt{4r}
+\end{align}
+$$
+
+Thus, to randomly sample $X$ and $Y$, we can sample a uniform distribution from 0 to 1, multiply it by four, and take its square root. These numbers can then be added together to sample $Z$:
+
+```{r}
+set.seed(1234)
+
+sims <- 10000
+Xs <- sqrt(4 * runif(n=sims))
+Ys <- sqrt(4 * runif(n=sims))
+Zs <- Xs + Ys
+
+hist(Zs)
+```
+
+The histogram of the sample distribution of $Z$ is shown above. 

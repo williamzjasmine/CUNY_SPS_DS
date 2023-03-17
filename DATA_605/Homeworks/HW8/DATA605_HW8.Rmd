@@ -1,0 +1,300 @@
+---
+title: "Data 605 HW8"
+author: "William Jasmine"
+date: "2023-03-16"
+output:
+  html_document:
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+  pdf_document: default
+---
+
+Questions come from ["Introduction to Probability"](https://math.dartmouth.edu/~prob/prob/prob.pdf) by Charles M. Grinstead.
+
+# Question 11, Section 7.2
+## Problem Description
+
+A company buys 100 lightbulbs, each of which has an exponential lifetime of
+1000 hours. What is the expected time for the first of these bulbs to burn
+out? (See Exercise 10.)
+
+## Solution 
+
+It's first helpful to actually solve question 10, which asks: "Let $X_1, X_2,..., X_n$ be $n$ independent random variables each of which has
+an exponential density with mean $µ$. Let M be the minimum value of the
+$X_j$ . Show that the density for $M$ is exponential with mean $µ/n$. Hint: Use
+cumulative distribution functions."
+
+We define $M$ as the minimum of our random variables: $M = \text{min}(X_1, X_2,..., X_n)$. The probability that $M$ is less than some sample value $m$ would then be equal to the probability that any of random variables are less than $m$:
+
+$$
+P(M \leq m) = P(X_1 \leq m \cup X_2 \leq m \cup \text{... } \cup X_n < m)
+$$
+
+Taking the complement of this statement (1 minus the probability that all the random variables are greater than $m$), we get that:
+
+$$
+P(M \leq m) = 1 - P(X_1 \geq m \cap X_2 \geq m \cap \text{... } \cap X_n \geq m)
+$$
+
+Using the fact that all of the $X$s are independent, we can rewrite the second term of the above using a product of probabilities:
+
+$$
+P(M \leq m) = 1 - P(X_1 \geq m)P(X_2 \geq m)...P(X_n < m)
+$$
+
+We know that the cumulative distribution function of a random variable $X$ is equal to $P(X \geq x) = \int_x^{\infty} f_X(x) dx$ where $f_X(x)$ represents the probability density function of $X$. Using the fact that each of our $X$s have exponential probability density, we can write:
+
+$$
+\begin{align}
+P(X \geq x) &= \int_x^{\infty} f_X(x) \\
+P(X \geq x) &= \int_x^{\infty} \lambda e^{-\lambda x} dx \\
+P(X \geq x) &= -e^{-\lambda x}|_x^{\infty} \\
+P(X \geq x) &= 0 - (-e^{-\lambda x}) \\
+P(X \geq x) &= e^{-\lambda x} \\
+\end{align}
+$$
+
+Plugging this result back into our previous equation, we have:
+
+$$
+\begin{align}
+P(M \leq m) &= 1 - (e^{-\lambda m}) (e^{-\lambda m})...(e^{-\lambda m}) \text{ , repeated } n \text{ times.} \\
+P(M \leq m) &= 1 - (e^{-\lambda m})^n \\
+P(M \leq m) &= 1 - e^{-\lambda mn} 
+\end{align}
+$$
+
+Taking the derivative of the above returns the PDF, $f_M(m)$:
+
+$$
+\begin{align}
+f_M(m) &= \frac{d}{dx} (1 - e^{-\lambda mn}) \\
+f_M(m) &= 0 - (-\lambda n e^{-\lambda m n} \\
+f_M(m) &= \lambda n e^{-\lambda m n} \\
+\end{align} 
+$$
+
+If we define $\Lambda = \lambda n$, then $f_M(m)$ is an exponential PDF with mean $\mu_M = \frac{1}{\Lambda}$. Thus:
+
+$$
+\begin{align}
+\mu_M &= \frac{1}{\lambda n} \\
+\mu_M &= \frac{1}{\frac{1}{\mu}n} \\
+\mu_M &= \frac{\mu}{n}
+\end{align}
+$$
+
+
+We can now use the above results to actually solve the question at hand. In this scenario we have 100 light bulbs ($n= 100$) that each last for 1,000 hours ($\mu = 1,000$). $\mu_M$ in this case represents the amount of time we can expect to pass before the first light bulb breaks, and thus:
+
+$$
+\mu_M = \frac{\mu}{n} = \frac{1000}{100} = 10
+$$
+
+In other words, we can expect the first light bulb to break after 10 hours. 
+
+
+## Empirical Testing 
+
+We can test the above result empirically by selecting random numbers $r$ from a uniform distribution between 0 and 1 and determining when that number is equal to the CDF of $M$. In other words, finding $x$ when $r = 1 - e^{-\lambda x} \Rightarrow x = \frac{\ln{(1-r)}}{-\lambda}$ . Once this is done 1,000 times we select the lowest value, which represents the amount of time it took for the first light bulb to break. This simulation process is repeated in the cell below 100,000 times:
+
+```{r}
+set.seed(1234)
+
+sims <- 100000
+n <- 100
+mu <- 1000
+l <- 1 / mu
+Ms <- c()
+
+for (i in 1:sims){
+  Xs <- log(1 - runif(n)) / (-l)
+  Ms[i] <- min(Xs)
+}
+
+hist(Ms, breaks=10000)
+```
+
+A histogram of the results is provided above, and we see that taking the average value from each simulation results in a number very close to 10:
+
+```{r}
+mean(Ms)
+```
+
+# Question 14, Section 7.2
+
+## Problem Description
+
+Assume that $X_1$ and $X_2$ are independent random variables, each having an
+exponential density with parameter $\lambda$. Show that $Z = X_1 − X_2$ has density:
+
+$$
+f_Z(z) = \frac{1}{2}\lambda e^{-\lambda |z|}
+$$
+
+## Solution
+
+From theorem 7.1 we know that given two random variables $X$ and $Y$, that the distribution function of their sum $Z$ is equal to: $f_Z(z) = \int_{-\infty}^{\infty}f_Y(z-x)f_X(x)dx$. Thus, rewriting our equation for $Z$ as $Z = X_1 + (-X_2)$, we have: 
+
+$$
+f_Z(z) = \int_{-\infty}^{\infty}f_{-X_2}(z-x_1)f_{X_1}(x_1) dx_1
+$$
+
+However, because $f_{-X_2}(z-x_1) = f_{X_2}(x_1-z)$, we can rewrite as:
+
+$$
+f_Z(z) = \int_{-\infty}^{\infty}f_{X_2}(x_1-z)f_{X_1}(x_1) dx_1
+$$
+
+To solve this integral, we will need to consider two different cases. 
+
+### Case 1
+
+First, we consider the case in which $z < 0$. Because our variables $X_1$ and $X_2$ have exponential density functions: 
+
+$$
+f_{X_1}(x_1) = f_{X_2}(x_2) =   
+  \begin{cases}
+        \lambda e^{-\lambda x_1} & \text{if } 0 < x_1 < \infty \\
+        0 & \text{otherwise }
+  \end{cases}
+$$
+
+we know the integral will always be equal to 0 if $x_1 < 0$. Thus, we only consider the range in which $0 < x_1 < \infty$. Since $z<0$, we can also be sure that $x_1 - z >0$. As such, the limits of our integration in this case should be from 0 to $\infty$. Plugging in the density functions to our integral gives:
+
+$$
+\begin{align}
+f_Z(z) &= \int_{0}^{\infty}f_{X_2}(x_1-z)f_{X_1}(x_1) dx_1 \\
+f_Z(z) &= \int_{0}^{\infty}\lambda e^{-\lambda(x_1-z)} \cdot \lambda e^{-\lambda x_1} dx_1 \\
+f_Z(z) &= \lambda^2\int_{0}^{\infty} e^{-\lambda x_1}e^{\lambda z}  e^{-\lambda x_1} dx_1 \\
+f_Z(z) &= \lambda^2e^{\lambda z}\int_{0}^{\infty} e^{-2\lambda x_1} dx_1 \\
+f_Z(z) &= \lambda^2e^{\lambda z} \cdot -\frac{1}{2\lambda}e^{-2\lambda x_1}|_0^{\infty} \\
+f_Z(z) &= \frac{-\lambda e^{\lambda z}}{2} \cdot e^{-2\lambda x_1}|_0^{\infty} \\
+f_Z(z) &= \frac{-\lambda e^{\lambda z}}{2} \cdot (0 - 1) \\
+f_Z(z) &= \frac{\lambda e^{\lambda z}}{2}
+\end{align} 
+$$
+
+### Case 2
+
+Next, we consider the case in which $z \geq 0$. This means that unless $x_1 > z$, the left term of our integral will evaluate to 0. Thus, in this scenario, we need only take the integral from $z$ to $\infty$. Using the result from the previous subsection we have: 
+
+$$
+\begin{align}
+f_Z(z) &= \frac{-\lambda e^{\lambda z}}{2} \cdot e^{-2\lambda x_1}|_z^{\infty} \\
+f_Z(z) &= \frac{-\lambda e^{\lambda z}}{2} \cdot (0 - e^{-2\lambda z}) \\
+f_Z(z) &= \frac{\lambda e^{-\lambda z}}{2}
+\end{align} 
+$$
+
+### Summary
+
+In conclusion, we have that:
+
+$$
+f_{Z}(z) =   
+  \begin{cases}
+        \frac{\lambda e^{\lambda z}}{2} & \text{if } z < 0 \\
+        \frac{\lambda e^{-\lambda z}}{2} & \text{if } z \geq 0
+  \end{cases}
+$$
+
+Using the definition of the absolute value function, the above equation can be rewritten as: $f_{Z}(z) = \frac{\lambda e^{\lambda |z|}}{2}$ 
+
+## Empirical Testing
+
+```{r}
+library(ggplot2)
+```
+
+We can empirically test the results above using random variables and setting $\lambda = \frac{1}{2}$:
+
+```{r}
+set.seed(1234)
+
+# number of sims to match length of ranges in next cell 
+sims <- 20002
+l <- 1/2
+
+X1s <- log(1 - runif(sims)) / (-l)
+X2s <- log(1 - runif(sims)) / (-l)
+Zs <- X1s - X2s
+```
+
+The cell below creates data using the theoretical solution from above. Note that it only uses a range $-1000 < z < 1000$, which should be more than enough to encapsulate the majority of simulated values: 
+
+```{r}
+range1x <- seq(-1000, 0, 0.1)
+range1y <- (l/2) * exp(l * range1x)
+range2x <- seq(0, 1000, 0.1)
+range2y <- (l/2) * exp(-l *range2x)
+
+xs <- c(range1x, range2x)
+ys <- c(range1y, range2y)
+plt_data <- data.frame(xs, ys, Zs)
+```
+
+A histogram of the simulated data is plotted against the expected density function in the cell below:
+
+```{r, warning=FALSE}
+
+ggplot(data=plt_data) + 
+  geom_histogram(
+    aes(x=Zs, y=..density..), bins = 100, alpha=0.6, color='green') +
+  geom_line(aes(x=xs, y=ys), color='red') +
+  xlab('z') +
+  ylab('F_Z(z)') +
+  ylim(0, 0.4) +
+  xlim(-10, 10)
+
+```
+
+As is clear from the plot above, the distribution of the simulated values of $Z$ matches the theoretical density function. 
+
+# Question 14, Section 7.2
+
+## Problem Description 
+Let $X$ be a continuous random variable with mean $\mu$ = 10 and variance $\sigma^2 = 100/3$. Using Chebyshev’s Inequality, find an upper bound for the
+following probabilities:
+
+(a) $P(|X-10|\geq 2)$
+(b) $P(|X-10|\geq 5)$
+(c) $P(|X-10|\geq 9)$
+(d) $P(|X-10|\geq 20)$
+
+## Solution 
+
+Chebyshev's inequality states: given a random variable $X$ with density function $f(x)$, suppose $X$ has a finite expected value $\mu$ and variance $\sigma^2$. Then for any positive number $\epsilon > 0$:
+
+$$
+\begin{equation}
+P(|X-\mu|\geq\epsilon) \leq \frac{\sigma^2}{\epsilon^2}
+\end{equation}
+$$
+
+We can solve a-d by creating a function `chebyshev`, that determines the upper bound of a given probability: 
+
+```{r}
+chebyshev <- function(e, v){
+  return(v / (e * e))
+}
+```
+
+We can run this function using a loop using all the desired values of $\epsilon$:
+
+```{r}
+es = c(2, 5, 9, 20)
+for (e in es){
+  print(chebyshev(e, 100/3))
+}
+```
+
+Note that the first two values cannot be accepted as probability cannot exceed 1. Thus, we have:
+
+(a) $P(|X-10|\geq 2) \leq 1$
+(b) $P(|X-10|\geq 5) \leq 1$
+(c) $P(|X-10|\geq 9) \leq 0.412$
+(d) $P(|X-10|\geq 20) \leq 0.083$
