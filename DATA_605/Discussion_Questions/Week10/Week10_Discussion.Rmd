@@ -1,0 +1,112 @@
+---
+title: "Data 605 Discussion - Week 10"
+author: "William Jasmine"
+date: "2023-03-29"
+
+output:
+  html_document:
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+  pdf_document: default
+---
+
+Question comes from ["Introduction to Probability"](https://math.dartmouth.edu/~prob/prob/prob.pdf) by Charles M. Grinstead.
+
+# Question 11, Section 11.1
+## Problem Description:
+
+Assume that a man’s profession can be classified as professional, skilled laborer, or unskilled laborer. Assume that, of the sons of professional men,
+80 percent are professional, 10 percent are skilled laborers, and 10 percent are unskilled laborers. In the case of sons of skilled laborers, 60 percent are skilled laborers, 20 percent are professional, and 20 percent are unskilled. Finally, in the case of unskilled laborers, 50 percent of the sons are unskilled laborers, and 25 percent each are in the other two categories. Assume that every man has at least one son, and form a Markov chain by following the profession of a randomly chosen son of a given family through several generations. Set up the matrix of transition probabilities. Find the probability that a randomly chosen great-grandson of an unskilled laborer is a professional man.
+
+## Solution 
+### Define Function
+
+The code below defines a function `get_p_state_change`, that can be used to determine the probability of changing from state $s_i$ to $s_f$ after $n$ steps of a markov chain with initial transition state matrix $P$. 
+
+```{r}
+get_markov_states <- function(tm, n){
+  tmp <- tm
+  for(i in 1:(n-1)){
+    tmp <- tmp %*% tm # multiply P by itself n-1 time to get P^n
+  }
+  return(tmp)
+}
+
+get_state_change <- function(tm, s, si, sf){
+  i <- which(s==si)
+  j <- which(s==sf)
+  return(tm[i,j]) # get probability p_ij from matrix P^n
+}
+
+get_p_state_change <- function(tm, n, s, si, sf){
+  # combine previous two functions
+  tm_n <- get_markov_states(tm, n)
+  return(get_state_change(tm_n, s, si,sf))
+}
+```
+
+### Utilize Function 
+
+Next, we define the inputs of our function and run it to determine the desired probability. Our states in this case are $P$ = "professional", $S$ = "skilled worker, and $U$ = "unskilled worker" and the transition matrix $P$ of probabilities that describe the probability of a worker's son ending up in any of the states is:  
+
+$$
+P = 
+\begin{pmatrix}
+0.8 & 0.1 & 0.1 \\
+0.2 & 0.6 & 0.2 \\
+0.25 & 0.25 & 0.5
+\end{pmatrix}
+$$
+
+In this case, the first row and column corresponds to the professional state, the second row and column corresponds to the skilled state, and the third row and column corresponds to the unskilled state.
+
+We want to know the probability that a great-grandson of a given unskilled worker (initial state $s_i=U$ ends up as a professional ($s_f=P$). This equates to the passage of three generations, hence $n=3$. These inputs utilized below:
+
+```{r}
+P <- rbind(c(0.8,0.1,0.1),c(0.2,0.6,0.2),c(0.25,0.25,0.5))
+states <- c('P', 'S', 'U') # must align with how P is created
+n <- 3
+s_i <- 'U'
+s_f <- 'P'
+
+get_p_state_change(tm=P, n=n, s=states, si=s_i, sf=s_f)
+```
+
+In other words, there is a 44.125% chance that the great-grandson of a unskilled worker ends up a professional. 
+
+### Simulation 
+
+The code below uses the transition matrix $P$ and states to simulate the scenario 100,000 times: 
+
+```{r}
+set.seed(1234)
+
+sims <- 100000
+n <- 3
+sfs <- c()
+
+for(i in 1:sims){
+  s <- 'U'
+  for(j in 1:n){
+    if(s == 'P'){
+      s <- sample(states, size=1, prob=P[1,])
+    }
+    else if(s == 'S'){
+      s <- sample(states, size=1, prob=P[2,])
+    }
+    else{
+      s <- sample(states, size=1, prob=P[3,])
+    }
+  }
+  sfs[i] <- s
+}
+```
+
+The vector `sfs` contains the simulated professions of the great-grandsons of a group of 100,000 hypothetical workers. We check below to see the percentage of them that ended up being "professionals": 
+
+```{r}
+length(which(sfs == 'P')) / sims
+```
+
+As expected, this percentage is very close to the theoretical 44.125% calculated earlier. 

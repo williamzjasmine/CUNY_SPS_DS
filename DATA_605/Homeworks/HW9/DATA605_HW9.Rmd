@@ -1,0 +1,289 @@
+---
+title: "Data 605 HW9"
+author: "William Jasmine"
+date: "2023-03-20"
+output:
+  html_document:
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+  pdf_document: default
+---
+
+# Question 1
+
+## Description
+
+This question comes from page 363, question #11 of ["Introduction to Probability"](https://math.dartmouth.edu/~prob/prob/prob.pdf) by Charles M. Grinstead.
+
+The price of one share of stock in the Pilsdorff Beer Company (see Exercise 8.2.12) is given by $Y_n$ on the $n$th day of the year. Finn observes that
+the differences $X_n = Y_{n+1} − Y_n$ appear to be independent random variables
+with a common distribution having mean $\mu = 0$ and variance $\sigma^2 = 1/4$. If $Y_1$ = 100, estimate the probability that $Y_{365}$ is
+
+(a) $\geq 100$.
+(b) $\geq 110$.
+(c) $\geq 120$.
+
+## Solution
+### Simulation
+
+We know that $Y_{365} = Y_1 + X_1 + X_2 + ... + X_{364} = Y_1 + \sum_{i=1}^{364}X_i$. Given that $\sum_{i=1}^{364}X_i$ is a sum of independent random variables, we can assume it follows a normal distribution via the Central Limit Theorem. Furthermore, we can define the mean $\mu_{364}$ and standard deviation $\sigma_{364}$ of this normal distribution as: 
+
+$$
+\begin{align}
+\mu_{364} &= 364\mu = 0 \\
+\sigma_{364} &= \sqrt{\sigma^2_{X_1}+ \sigma^2_{X_1} + ... + \sigma^2_{364}} = \sqrt{\frac{364}{4}}
+\end{align}
+$$
+
+We can use this mean and standard deviation to sample from a normal distribution and simulate 100,000 different values of $Y_{365}$:
+
+```{r}
+sd = sqrt(364/4)
+sims = 100000
+
+Y_365s = 100 + rnorm(sims, mean=0, sd=sd)
+```
+
+We can now use these simulated $Y_{365}$ values to estimate the probabilities:
+
+```{r}
+P_a <- length(which(Y_365s > 100)) / sims 
+P_b <- length(which(Y_365s > 110)) / sims 
+P_c <- length(which(Y_365s > 120)) / sims
+
+str1 <- paste('Estimated probability of Y_365 >= 100:', P_a)
+str2 <- paste('Estimated probability of Y_365 >= 110:', P_b)
+str3 <- paste('Estimated probability of Y_365 >= 120:', P_c)
+str_final <- paste(str1, str2, str3, sep = '\n')
+writeLines(str_final)
+```
+
+```{r, eval=FALSE}
+# the below can be used to check the above values
+# using z-score and pnorm distribution
+
+1-pnorm((100-100)/(0.5*sqrt(364)))
+1-pnorm((110-100)/(0.5*sqrt(364)))
+1-pnorm((120-100)/(0.5*sqrt(364)))
+```
+
+# Question 2
+
+## Description
+Calculate the expected value and variance of the binomial distribution using the moment generating function.
+
+## Solution
+
+Given a discrete random variable $X$ with probability mass function $f_X(x)$ and dummy parameter $t$, the moment generating function of $X$ is defined as the expectation value of $e^{tX}$:
+
+$$
+\begin{equation}
+M_X(t) = E[e^{tX}]
+\end{equation}
+$$
+
+Using the fact that, for a discrete random variable, $E[X] = \sum_{x \in X} x \cdot p(x)$, we have:
+
+$$
+\begin{equation}
+M_X(t) = \sum_{x\in X}e^{tx} \cdot f_X(x)
+\end{equation}
+$$
+
+Since $X$ follows a binomial distribution in which $0 \leq x \leq n$, we can write:
+
+$$
+\begin{align}
+M_X(t) &= \sum_{x=0}^ne^{tx} \cdot {n \choose x} p^x q^{x-n} \\
+M_X(t) &= \sum_{x=0}^n {n \choose x}(pe^t)^xq^{x-n}
+\end{align}
+$$
+
+The binomial theorem tells us that $(u+v)^n = \sum_{x=0}^n {n \choose x}u^xv^{n-x}$, and as such we can simplify the above sum:
+
+$$
+\begin{equation}
+M_X(t) = (pe^t + q)^n
+\end{equation}
+$$
+
+Once we have the moment generating function of $X$, we can use it to determine $E[X]$ and $E[X^2]$:
+
+$$
+\begin{align}
+E[X] &= M'_X(0) \\
+E[X^2] &= M''_X(0)
+\end{align}
+$$
+
+Thus, we first find $M'_X(t)$:
+
+$$
+\begin{align}
+M'_X(t) &= \frac{d}{dt}((pe^t + q)^n) \\
+M'_X(t) &= npe^t(pe^t+q)^{n-1} \\
+\end{align}
+$$
+
+Using the above in conjunction with the fact that $p+q=1$, we can determine $E[X]$:
+
+$$
+\begin{align}
+E[X] &= M'_X(0) \\
+E[X] &= npe^0(pe^0+q)^{n-1} \\
+E[X] &= np(p+q)^{n-1} \\
+E[X] &= np(1)^{n-1} \\
+E[X] &= np
+\end{align}
+$$
+
+Next, we determine $M''_X(t)$:
+
+$$
+\begin{align}
+M''_X(t) &= \frac{d}{dt}(npe^t(pe^t+q)^{n-1}) \\
+M''_X(t) &= n(n-1)(pe^t)^2+npe^t(pe^t+q)^{n-2} \\
+\end{align}
+$$
+
+Once again we evaluate at 0 to find $E[X^2]$:
+
+$$
+\begin{align}
+E[X^2] &= M''_X(0) \\
+E[X^2] &= n(n-1)(pe^0)^2+npe^0(pe^0+q)^{n-2} \\
+E[X^2] &= n(n-1)(p^2)+np(p+q)^{n-2} \\
+E[X^2] &= n^2p^2-np^2+ np\\
+\end{align}
+$$
+
+To find the variance $\sigma^2$, we use the fact that $\sigma^2 = E[X^2] - E[X]^2$:
+
+$$
+\begin{align}
+\sigma^2 &= n^2p^2-np^2+ np -(np)^2 \\
+\sigma^2 &= np -np^2 \\
+\sigma^2 &= np(1-p) \\
+\sigma^2 &= npq
+\end{align}
+$$
+
+Thus, to summarize, we have confirmed using the binomial distribution's moment generating function that: $E[X] = \mu = np$ and $\sigma^2 = npq$.
+
+# Question 3
+
+## Description 
+
+Calculate the expected value and variance of the exponential distribution using the moment generating function.
+
+## Solution 
+
+Given a continuous random variable $X$ with probability density function $f_X(x)$ and dummy parameter $t$, the moment generating function of $X$ is defined as the expectation value of $e^{tX}$:
+
+$$
+\begin{equation}
+M_X(t) = E[e^{tX}]
+\end{equation}
+$$
+
+Using the fact that, for a continuous random variable, $E[X] = \int_{-\infty}^{\infty} x \cdot p(x)$, we have:
+
+$$
+\begin{equation}
+M_X(t) = \int_{-\infty}^{\infty}e^{tx} \cdot f_X(x)\,dx
+\end{equation}
+$$
+
+Since $X$ follows an exponential distribution in which:
+
+$$
+\begin{equation}
+f_X(x) =
+  \begin{cases}
+        \lambda e^{-\lambda x} & \text{if } 0 \leq x < \infty\\
+        0 & \text{otherwise }
+  \end{cases}
+\end{equation}
+$$
+we can write:
+
+$$
+\begin{align}
+M_X(t) &= \int_{0}^{\infty}e^{tx} \lambda e^{-\lambda x} \, dx \\
+M_X(t) &= \lambda \int_{0}^{\infty}e^{x(t-\lambda)} \, dx \\
+M_X(t) &= \frac{\lambda}{t-\lambda}e^{x(t-\lambda)}|_0^{\infty}
+\end{align}
+$$
+
+For $t<\lambda$, this integral evaluates to:
+
+$$
+\begin{align}
+M_X(t) &= \frac{\lambda}{t-\lambda}(0-1) \\
+M_X(t) &= \frac{\lambda}{\lambda - t}
+\end{align}
+$$
+
+Now that we have the moment generating function of $X$, we can use it to determine $E[X]$ and $E[X^2]$:
+
+$$
+\begin{align}
+E[X] &= M'_X(0) \\
+E[X^2] &= M''_X(0)
+\end{align}
+$$
+
+We first find $M'_X(t)$ below:
+
+$$
+\begin{align}
+M'_X(t) &= \frac{d}{dt}\left( \frac{\lambda}{\lambda - t} \right) \\
+M'_X(t) &= \frac{\lambda}{(\lambda-t)^2} \\
+\end{align}
+$$
+
+Using the above, we can determine $E[X]$:
+
+$$
+\begin{align}
+E[X] &= M'_X(0) \\
+E[X] &= \frac{\lambda}{(\lambda-0)^2} \\
+E[X] &= \frac{\lambda}{\lambda^2} \\
+E[X] &= \frac{1}{\lambda} \\
+\end{align}
+$$
+
+Next, we determine $M''_X(t)$:
+
+$$
+\begin{align}
+M''_X(t) &= \frac{d}{dt}(\frac{\lambda}{(\lambda-t)^2}) \\
+M''_X(t) &= \frac{2\lambda}{(\lambda-t)^3} \\
+\end{align}
+$$
+
+Once again we evaluate at 0 to find $E[X^2]$:
+
+$$
+\begin{align}
+E[X^2] &= M''_X(0) \\
+E[X^2] &= \frac{2\lambda}{(\lambda-0)^3} \\
+E[X^2] &= \frac{2}{\lambda^2} 
+\end{align}
+$$
+
+To find the variance $\sigma^2$, we use the fact that $\sigma^2 = E[X^2] - E[X]^2$:
+
+$$
+\begin{align}
+\sigma^2 &= \frac{2}{\lambda^2} - \left(\frac{1}{\lambda} \right)^2 \\
+\sigma^2 &= \frac{1}{\lambda^2} 
+\end{align}
+$$
+
+Thus, to summarize, we have confirmed using the exponential distribution's moment generating function that: $E[X] = \mu = \frac{1}{\lambda}$ and $\sigma^2 = \frac{1}{\lambda^2}$.
+
+
+

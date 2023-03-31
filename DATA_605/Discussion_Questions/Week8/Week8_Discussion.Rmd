@@ -78,7 +78,7 @@ f_W(w) &= \int_{w-1}^{0}f_U(u) du + \int_{0}^{w}f_U(u) du
 \end{align}
 $$
 
-Based our initial definition of $f_U(u)$, the left integral must be 0, and since we know $w \leq1 $, the second integral must be equal to $u$. Thus, we have: 
+Based our initial definition of $f_U(u)$, the left integral must be 0, and since we know $w \leq 1$, the second integral must be equal to $u$. Thus, we have: 
 
 $$
 \begin{align}
@@ -89,7 +89,7 @@ $$
 
 ### Case 1: $1 \leq w \leq 2$
 
-Similarly, if If $0 \leq w \leq 1$, then we know that $w - 1$ must be less than 1. Following the same pattern we have: 
+Similarly, if If $1 \leq w \leq 2$, then we know that $w - 1$ must be less than 1. Following the same pattern we have: 
 
 $$
 \begin{align}
@@ -149,8 +149,8 @@ We can simulate this scenario by repeatedly choosing random values between 0 and
 ```{r}
 set.seed(1234)
 
-# use 30,003 simulations to match seq values in next cell
-sims <- 30003
+# use 30,0001 simulations to match seq values in next cell
+sims <- 30001
 Ws <- numeric(sims)
 
 for (i in 1:3){
@@ -162,9 +162,9 @@ for (i in 1:3){
 The cell below creates data using the theoretical solution from above: 
 
 ```{r}
-range1x <- seq(0, 1, 0.0001)
+range1x <- seq(0, .9999, 0.0001)
 range1y <- (range1x * range1x) / 2
-range2x <- seq(1, 2, 0.0001)
+range2x <- seq(1, 1.9999, 0.0001)
 range2y <- -(range2x * range2x) + 3 * range2x - (3/2)
 range3x <- seq(2, 3, 0.0001)
 range3y <- ((range3x - 3) ** 2) / 2
