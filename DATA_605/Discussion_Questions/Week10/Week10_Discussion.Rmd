@@ -61,7 +61,7 @@ $$
 
 In this case, the first row and column corresponds to the professional state, the second row and column corresponds to the skilled state, and the third row and column corresponds to the unskilled state.
 
-We want to know the probability that a great-grandson of a given unskilled worker (initial state $s_i=U$ ends up as a professional ($s_f=P$). This equates to the passage of three generations, hence $n=3$. These inputs utilized below:
+We want to know the probability that a great-grandson of a given unskilled worker (initial state $s_i=U$) ends up as a professional ($s_f=P$). This equates to the passage of three generations, hence $n=3$. These inputs utilized below:
 
 ```{r}
 P <- rbind(c(0.8,0.1,0.1),c(0.2,0.6,0.2),c(0.25,0.25,0.5))
@@ -109,4 +109,4 @@ The vector `sfs` contains the simulated professions of the great-grandsons of a 
 length(which(sfs == 'P')) / sims
 ```
 
-As expected, this percentage is very close to the theoretical 44.125% calculated earlier. 
+As expected, this percentage is very close to the theoretical 44.125% calculated earlier.

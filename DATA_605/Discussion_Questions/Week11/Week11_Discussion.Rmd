@@ -1,0 +1,118 @@
+---
+title: "Data 605 Discussion - Week 11"
+author: "William Jasmine"
+date: "2023-04-25"
+
+output:
+  html_document:
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+  pdf_document: default
+---
+
+```{r, message=FALSE}
+library(tidyverse)
+library(lmtest)
+```
+
+# Assignment Description 
+
+Using R, build a  regression model for data that interests you. Conduct residual analysis.  Was the linear model appropriate? Why or why not?
+
+# Import, Clean Data
+
+The data I will be using come from R's `CO2` dataset, which records the carbon dioxide ($CO_2$) "uptake of six plants from Quebec and six plants from Mississippi measured at several levels of ambient $CO_2$ concentration. Half the plants of each type were chilled overnight before the experiment was conducted." A summary of the data is provided below:
+
+```{r}
+data(CO2)
+summary(CO2)
+```
+
+To limit our regression model's independent variables to two, the cell below filters the data to only include rows where `type=="Quebec"`:
+
+```{r}
+CO2 <- CO2 %>% 
+  filter(Type == 'Quebec')
+```
+
+# Build, Summarize Model
+We can now build and summarize a linear regression model using `uptake` as the dependent variable, and `treatment` and `conc` as the independent variables:
+
+```{r}
+lin_reg <- lm(uptake ~ conc + Treatment, data=CO2)
+summary(lin_reg)
+```
+
+Based on the summary, and given that $\hat{y}$ = `uptake`, $\beta_1$ = `conc` and $\beta_2$  = `Treatment`:
+
+* For non-chilled plants: $\hat{y} = 22.93 + (0.02\beta_1)$
+* For chilled plants: $\hat{y} = 22.93 + (0.02\beta_1) + (-6.86\beta_2)$
+
+In addition, both `Treatment`, and `conc` are listed as being statistically significant predictors of `uptake`. While this is promising, we cannot use this model until we confirm that it passes all the assumptions of linear regression. 
+
+# Check Assumptions 
+
+The assumptions of linear regression are listed below: 
+
+1. *Linear relationship:* There exists a linear relationship between the independent variable, $x$, and the dependent variable, $y$.
+2. *Normality:* The residuals of the model are normally distributed.
+3. *Homoscedasticity:* The residuals have constant variance at every level of $x$.
+4. *Independence*: The residuals are independent. In particular, there is no correlation between consecutive residuals in time series data.
+
+## Linear Relationship 
+
+The below code plots the data against the model's fitted lines for both chilled and non-chilled plants:
+
+```{r}
+ggplot(data = CO2, aes(x = conc, y = uptake, color = Treatment)) +
+  geom_jitter() + 
+  geom_smooth(method = "lm", formula = y ~ x, se = FALSE)
+```
+
+The plot shows that there does indeed appear to be a linear relationship between `conc` and `uptake` for both chilled and non-chilled plants. Namely, as $CO2$ concentration increases, so does $CO_2$ uptake. 
+
+## Normality
+
+The code below plots a histogram of the residual lengths.
+
+```{r}
+ggplot(lin_reg, aes(x = .resid)) +
+  geom_histogram(binwidth = 3) 
+```
+
+The residuals do appear to be somewhat normally distributed. We can confirm this statistically via a Shapiro-Wilk hypothesis test on the lengths of the residuals:
+
+```{r}
+shapiro.test(lin_reg$residuals)
+```
+
+## Homoscedasticity
+
+The code creates a plot of the residuals as a function of the fitted values:
+
+```{r}
+ggplot(lin_reg, aes(x = .fitted, y = .resid)) +
+  geom_point() +
+  geom_hline(yintercept = 0)
+```
+
+This plot shows that the spread (variance) of the residual lengths is do not appear equal for all fitted values of `uptake`, in other words the data does not appear to be homoscedastic. We can confirm this via a Breusch-Pagan test: 
+
+```{r}
+bptest(lin_reg)
+```
+
+Indeed, the result of the test confirms that the data is not homoscedastic. 
+
+## Independence 
+
+Based off the above residual plot above, we can however confirm that there is not a strong correlation between the residuals and fitted values. This is further evidenced by the fact that the correlation coefficient between the two is very close to 0:
+
+```{r}
+cor(lin_reg$residuals, lin_reg$fitted.values)
+```
+
+# Conclusion 
+
+Based off the analysis above we have confirmed that results of the `lin_reg` looked promising, residual analysis revealed that it does not satisfy the homoscedasticity condition. As such, it is not a valid model to be used in practice. Based off the appearance of the scatter plot data, a logarithmic function might be better suited as a model in this case. 

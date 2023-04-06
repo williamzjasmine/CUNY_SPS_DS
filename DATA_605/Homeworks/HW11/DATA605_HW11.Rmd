@@ -1,0 +1,140 @@
+---
+title: "Data 605 HW11"
+author: "William Jasmine"
+date: "2023-04-03"
+output:
+  html_document:
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+  pdf_document: default
+---
+
+```{r, message=FALSE}
+seed <- 1234
+library(tidyverse)
+library(lmtest)
+```
+
+# Assignment Description
+
+Using the “cars” dataset in R, build a linear model for stopping distance as a function of speed and replicate the analysis of your textbook chapter 3 (visualization, quality evaluation of the model, and residual analysis.)
+
+# Solution
+## Import Data, Create Linear Model
+
+The cell below imports the data and prints a summary of the data it contains. 
+
+```{r}
+data(cars)
+summary(cars)
+```
+
+As we can see in the above output, the `cars` dataset contains two variables: `speed` and `dist`. More specifically, the dataset describes the distance it takes a car to stop at different speeds. 
+
+Using these two fields, we can build a linear model that fits the data to a line using the following equation: 
+
+$$
+\begin{equation}
+\hat{y} = a_0 + a_1x
+\end{equation}
+$$
+
+In this case, $\hat{y}$ (the dependent variable, or the values predicted by the model) will be `distance`, $x$ (the independent variable of the model) will be `speed`, and $a_0$ and $a_1$ will be the fitted values of the $y$-intercept and slope, respectively. The model is produced in the code cell below and defined as `lin_reg`:
+
+```{r}
+
+lin_reg <- lm(dist ~ speed, data=cars)
+lin_reg
+```
+
+## Check Assumptions
+
+Before we evaluate the performance of the model, we must check that the assumptions of linear regression are true. If not, our model could be unreliable or even misleading. The four assumptions of linear regression are the following:
+
+1. *Linear relationship:* There exists a linear relationship between the independent variable, $x$, and the dependent variable, $y$.
+2. *Normality:* The residuals of the model are normally distributed.
+3. *Homoscedasticity:* The residuals have constant variance at every level of $x$.
+4. *Independence*: The residuals are independent. In particular, there is no correlation between consecutive residuals in time series data.
+
+### Linear Relationship
+
+To check whether or not `speed` and `distance` have a linear relationship, we can create a scatter plot overlayed with the line produced by the fitted values of $a_0$ and $a_1$ from the model:
+
+```{r}
+ggplot(data=cars, aes(x=speed, y=dist)) +
+  geom_point() +
+  geom_abline(slope=lin_reg$coefficients[2], 
+              intercept=lin_reg$coefficients[1],
+              color='red')
+```
+
+Based off visual analysis, it is clear that the line provides a more than reasonable fit to the data, and that these two variables do appear to exhibit a linear relationship. 
+
+### Normality
+
+To check if the residuals are normally distributed, we can make a histogram:
+
+```{r}
+ggplot(lin_reg, aes(x = .resid)) +
+  geom_histogram(binwidth = 5) 
+```
+
+While visual analysis reveals that the distribution of reisdual lengths do indeed look normal, we can confirm statistically this is the case via a [shapiro-wilk](https://search.r-project.org/CRAN/refmans/psyntur/html/shapiro_test.html) test. The alternative hypothesis of this test is that the data does not follow a normal distribution, and thus the desired result is for a $p$-value > 0.05. 
+
+```{r}
+shapiro.test(lin_reg$residuals)
+```
+
+Given the high $p$-value, we can confirm that the normality assumption is met.
+
+### Homoscedasticity
+
+To check if the homoscedasticity condition is met, we can create a plot of the residuals as a function of the fitted values:
+
+```{r}
+ggplot(lin_reg, aes(x = .fitted, y = .resid)) +
+  geom_point() +
+  geom_hline(yintercept = 0)
+```
+
+While the distribution of residuals looks somewhat equal accross all fitted values, there does appear to be a wider spread towards the right side of the plot. Since the visual analysis does not provide full confidence that this assumption is met, we can confirm statistically via a [Breusch-Pagan](https://search.r-project.org/CRAN/refmans/lmtest/html/bptest.html) test. The alternative hypothesis of this test is that the distribution of the variance of the residuals differs for different values of $y$ (i.e. the data is not homoskedastic), and thus, once again, the desired result of the test is to obtain a $p$-value > 0.05:
+
+```{r}
+bptest(lin_reg)
+```
+
+We see that this is indeed the case, and confirm the homoscedasticity assumption.
+
+### Independence
+
+Based off the above residual plot above, we can also confirm that there is not a strong correlation between the residuals and fitted values. This is further evidenced by the fact that the correlation coefficient between the two is very close to 0:
+
+```{r}
+cor(lin_reg$residuals, lin_reg$fitted.values)
+```
+
+As such, we confirm that the final linear regression assumption model is met.
+
+## Evaluate Model
+
+Now that we have confirmed that our model meets all the assumptions of linear regression, we can evaluate the performance of our model:
+
+```{r}
+summary(lin_reg)
+```
+
+From the above output we see that `speed` is indeed a significantly significant predictor of `distance`, and results in a model with a significantly high $R^2$ value. More specifically, `speed` in this linear regression model accounts for 64.38% of the variance observed in `distance`. For using only a single predictor variable, this is quite impressive!
+
+## Predict Values
+
+Given that we have now confirmed our model can be used reliably, we can create a function that uses the outputs of the model to predict the stopping distance of a car given any speed. The cell below creates a function `predict_stopping_speed` and uses it to predict the stopping distance of a car travelling 100 mph: 
+
+```{r}
+predict_stopping_distance <- function(car_speed){
+  return(unname(lin_reg$coefficients[2] * car_speed + lin_reg$coefficients[1]))
+}
+
+predict_stopping_distance(100)
+```
