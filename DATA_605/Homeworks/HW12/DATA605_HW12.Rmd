@@ -1,0 +1,171 @@
+---
+title: "Data 605 HW12"
+author: "William Jasmine"
+date: "2023-04-23"
+output:
+  html_document:
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+  pdf_document: default
+---
+
+```{r, message=FALSE}
+library(tidyverse)
+library(lmtest)
+```
+
+The data used to complete this assignment is imported from a `.csv` file and summarized in the R cell below:
+
+```{r}
+df <- read.csv('who.csv')
+summary(df)
+```
+
+A data dictionary of the columns included the dataset is provided below: 
+
+Column Name  | Description
+------------- | -------------
+`Country` | Name of the country.
+`LifeExp` | Average life expectancy for the country in years.
+`InfantSurvival` | Proportion of those surviving to one year or more.
+`Under5Survival` | Proportion of those surviving to five years or more.
+`TBFree` | Proportion of the population without TB.
+`PropMD` | Proportion of the population who are MDs
+`PropRN` | Proportion of the population who are RNs
+`PersExp` | Mean personal expenditures on healthcare in US dollars at average exchange rate.
+`GovtExp` | Mean government expenditures per capita on healthcare, US dollars at average exchange rate.
+`TotExp` | Sum of personal and government expenditures.
+
+
+# Question 1
+## Description
+Provide a scatterplot of `LifeExp~TotExp`, and run simple linear regression. Do not transform the variables. Provide and interpret the $F$ statistics, $R^2$, standard error, and $p$-values only. Discuss whether the assumptions of simple linear regression met.
+
+## Solution
+
+A scatter plot of `LifeExp` and `TotExp` is provided below: 
+
+```{r}
+ggplot(data = df, aes(x=TotExp, y=LifeExp)) +
+  geom_point()
+```
+
+Furthermore, the cell below creates a linear model in relating these two variables: 
+
+```{r}
+lin_reg <- lm(LifeExp ~ TotExp, data=df)
+summary(lin_reg)
+```
+
+The $p$-value for `TotExp` model are less than 0.01, which indicates that `TotExp` is a statistically significant predictor of `LifeExp`. Furthermore, the $p$-value of the intercept indicates that the intercept term (the value of `LifeExp` when `TotExp` is 0) is statistically different than 0. The $F$ statistic value is unhelpful at face value, but it used to determine the $p$-value of the overall model. Under the hood `lm` uses the $F$ distribution at the provided degrees of freedom, and calculates the area under that distribution where the density is less than the calculated $F$ statistic. This area is the provided $p$ value (can be done for this case in R via the following command `pf(2.326, df = 1, df2 = 188, lower.tail = FALSE)`). 
+
+While the model is presented as being statistically significant, it can definitely improved upon. The $R^2$ value is given as 0.2577, meaning that the model only accounts for ~26% of the variance contained within `LifeExp`. Furthermore, the standard error value of 9.371 tells us that the predicted values of `LifeExp` by the model are on average $\pm$9.371 years different from actual figures provided in the data. 
+
+Its also important to check that the actual assumptions of linear regression are met, seeing as usage of the model might provide misleading predictions if this were the case. The assumptions of linear regression are given below: 
+
+1. *Linear relationship:* There exists a linear relationship between the independent variable, $x$, and the dependent variable, $y$.
+2. *Normality:* The residuals of the model are normally distributed.
+3. *Homoscedasticity:* The residuals have constant variance at every level of $x$.
+4. *Independence*: The residuals are independent. In particular, there is no correlation between consecutive residuals in time series data.
+
+By visual analysis of the previously created scatterplot, it is easy to see that there does not exist a linear relationship between `LifeExp` and `TotExp`. The structure of the scatterplot looks like these variables looks much more exponential in nature, which is something that could be fixed via a logarithmic transformation. As such, we conclude that the assumptions of linear regression are not met, without having to even check the rest. 
+
+# Question 2
+## Description
+
+Raise life expectancy to the 4.6 power (i.e., LifeExp^4.6). Raise total expenditures to the 0.06 power (nearly a log transform, TotExp^.06). Plot LifeExp^4.6 as a function of TotExp^.06, and re-run the simple regression model using the transformed variables. Provide and interpret the F statistics, R^2, standard error, and p-values. Which model is "better?"
+
+## Solution
+
+The cell below performs the desired transformation of the variables by creating two new columns, `LifeExpT` and `TotExpT`: 
+
+```{r}
+xT <- 0.06
+yT <- 4.6
+df <- df %>% 
+  mutate(LifeExpT = LifeExp^yT,
+         TotExpT = TotExp^xT)
+```
+
+Note that after performing these transformations, the scatter plot of the newly created columns provides a structure that is much more linear in nature compared to the previous plot: 
+
+```{r}
+ggplot(data = df, aes(x=TotExpT, y=LifeExpT)) +
+  geom_point()
+
+```
+
+It is clear that our linear relationship assumption is now met. 
+
+The cell below creates a new linear regression model using these transformed fields: 
+
+```{r}
+lin_regT <- lm(LifeExpT ~ TotExpT, data=df)
+summary(lin_regT)
+```
+
+Once again, we see a $F$-statistic value that results in $p$-value less than 0.0, indicating that `TotExpT` is a statistically significant predictor of `LifeExpT`. The difference in this case however, is that is it clear that transforming the data had a positive impact on the model. The new $R^2$ value is 0.7263, meaning that ~73% of the variance seen within `LifeExpT` can be explained by `TotExpT`. It is worth noting that the standard error value is quite high, but it is still not an unreasonable percentage of the max predicted `LifeExpT` value. 
+
+# Question 3
+## Description
+Using the results from 3, forecast life expectancy when `TotExp^.06` =1.5. Then forecast life expectancy when `TotExp^.06`=2.5.
+
+## Solution 
+
+The cell below uses the `predict` function to forecast life expectancy for the two values of `TotExpT`:
+
+```{r}
+pred_x <- c(1.5, 2.5)
+pred_x <- as.data.frame(pred_x)
+colnames(pred_x) <- 'TotExpT'
+preds <-
+  cbind(pred_x^(1/xT), as.data.frame((predict(lin_regT, pred_x)^(1/yT))))
+colnames(preds) <- c('x', 'pred_y')
+preds
+```
+
+Note that the given values and their predictions in this case each had to be transformed once more to undo the previously applied exponential transformations (raising to the 1/0.06 power for `x`, and to the 1/4.6 power for `pred_y`). The data above can be interpreted as follows: 
+
+* The linear model predicts that if the sum of a country's per capita personal and government expenditure on healthcare per year is $860.71 per year, then the average life expectancy in that country, is about 63.3 years old.
+
+* If that total expenditure is $4,288,777.125, then the average life expectancy is predicted to be 86.5 years old. It's worth nothing that this is quite an unlikely scenario, as this represents an extremely high per capita healthcare cost. 
+
+# Question 4
+## Description 
+
+Build the following multiple regression model and interpret the $F$ Statistics, $R^2$, standard error, and $p$-values. How good is the model? 
+`LifeExp = b0+b1 x PropMd + b2 x TotExp +b3 x PropMD x TotExp`
+
+## Solution 
+
+The regression model is built and summarized in the cell below:
+
+```{r}
+lin_regM <- lm(LifeExp ~ PropMD + TotExp + (PropMD*TotExp), data = df)
+summary(lin_regM)
+```
+
+This model does seem to perform better than the first model (higher $R^2$ value, lower standard error), but it still does not come close to the $R^2$ value achieved from the model that utilized the logarithmic transformations. 
+
+# Question 5
+## Description 
+
+Forecast `LifeExp` when `PropMD`=.03 and `TotExp` = 14. Does this forecast seem realistic? Why or why not?
+
+## Solution 
+
+The forcasts are made in the cell below:
+
+```{r}
+pred_x <- cbind(0.03, 14)
+pred_x <- as.data.frame(pred_x)
+colnames(pred_x) <- c('PropMD', 'TotExp')
+preds <-
+  cbind(pred_x, as.data.frame((predict(lin_regM, pred_x))))
+colnames(preds) <- c('PropMD', 'TotExp', 'pred_y')
+preds
+```
+
+Based on the data above, the linear model predicts that if 3% of a country's residents are doctors, and the per capita combined personal and government expenditure on healthcare is $14 a year, that the average life expectancy in that country will be ~107.7 years old. While the inflated estimate is likely due to the fact that the model places emphasis on the relatively high 0.03 `PropMd` value (the average value for this field in the dataset is ~0.002), it is further made to seem unreasonable by the fact that we are using such a small value of `TotExp`. 
