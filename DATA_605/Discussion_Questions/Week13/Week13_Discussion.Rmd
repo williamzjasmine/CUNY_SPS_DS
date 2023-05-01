@@ -1,0 +1,64 @@
+---
+title: "Data 605 Discussion - Week 13"
+author: "William Jasmine"
+date: "2023-04-25"
+
+output:
+  html_document:
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+  pdf_document: default
+---
+
+
+Question comes from ["APEX Calculus"](https://open.umn.edu/opentextbooks/textbooks/198) by Gregory Hartman.
+
+# Question 11, Section 7.5
+## Problem Description:
+
+A box weighing 2 lbs lifts 10 lbs of sand vertically by 50 ft. A crack in the box allows the sand to leak out such that 9 lbs of sand is in the box at the end of the trip. Assume the sand leaked out at a uniform rate. What is the total work done in lifting the box and sand?
+
+## Solution 
+
+The work $W$ done on the box can be found via the following formula:
+
+$$
+\begin{equation}
+W = \int_a^b F(x) \ dx 
+\end{equation}
+$$
+
+where $a$ and $b$ are the beginning and end distances over which the force was applied. In this case, $F(x)$ represents the weight of the box as it makes its journey, since this is the force required to lift the box against gravity. Given that sand leaves the box at a uniform rate, we know that $F(x)$ must be a linear function, and we know from the problem that $F(0) = 10 + 2 = 12$ and $F(50) = 9 + 2 = 11$. Using the fact that the equation of a line is $y = mx + b$, this allows to determine that $F(x) = -\frac{1}{50}x + 12$. This equation is plotted below:
+
+```{r}
+x <- seq(0,50, 0.1)
+F_x <- (-1/50) * x + 12
+plot(x, F_x)
+```
+
+Thus, the integral needed to be solved is as follows: 
+
+$$
+W = \int_a^b F(x) \ dx = \int_0^{50} -\frac{1}{50}x + 12 dx 
+$$
+
+Solving the integral gives: 
+
+
+$$
+\begin{align}
+W &= -\frac{x^2}{100} + 12 x |_0^{50} \\
+W &= -\frac{50^2}{100} + 12(50) \\
+W &= -\frac{2500}{100} + 600 \\
+W &= 575 \ \text{lb-ft}
+\end{align}
+$$
+
+If you wanted to solve in R:
+
+```{r}
+f <- function(x){-(1/50)*x + 12}
+W <- integrate(f, lower = 0, upper = 50)
+print(W)
+```
