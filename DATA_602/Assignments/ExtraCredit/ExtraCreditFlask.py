@@ -13,7 +13,10 @@ def my_form_post():
     if request.method == 'POST':
         number = request.form['number']
         multiply_number = float(number) * 5
-        return '%s number multiplied by 5 is: %s * 5 = %f' % (number, number, multiply_number) 
+        #temp_form_dict = request.form.to_dict()
+        #temp_form_dict['number'] = request.form.to_dict()
+        #request.form = ImmutableMultiDict(temp_form_dict)
+        return '%s number multiplied by 5 is: %s * 5 = %f' % (number, number, multiply_number) #request.form
 
 if __name__ == '__main__':
    app.run(debug = True)
