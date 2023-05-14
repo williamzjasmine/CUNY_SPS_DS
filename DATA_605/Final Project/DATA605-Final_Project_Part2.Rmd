@@ -1,0 +1,528 @@
+---
+title: "Data 605 - Final Project - Part 2"
+author: "William Jasmine"
+date: "2023-05-17"
+output:
+  html_document:
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+  pdf_document: default
+---
+
+```{r, message=FALSE}
+library(gridExtra)
+library(GGally)
+library(psychometric)
+library(tidyverse)
+library(matrixcalc)
+library(MASS)
+library(car)
+library(fastDummies)
+library(lmtest)
+```
+
+# Introduction
+
+This part of the assignment involves using data from Kaggle's [Housing Prices: Advanced Regression Techniques competition](https://www.kaggle.com/c/house-prices-advanced-regression-techniques). The data from this page is loaded in the cell below:
+
+```{r}
+df <- read.csv("Data/train.csv")
+dim(df)
+```
+
+Each observation from the dataset in this case represents a home sale made in Ames, Iowa. We see from the above output that it contains data from 1,460 home sales, each having information pertaining to 79 different explanatory variables. The dataset also includes the target variable, `sale price`. To help limit the scope of the data, the following cell filters out a subset of 9 of explanatory fields (along with the target variable):
+
+```{r}
+df <- df %>% dplyr::select(
+  Utilities, BldgType, Neighborhood, OverallCond, OverallQual, 
+  TotalBsmtSF, GrLivArea, YearBuilt, YrSold, SalePrice
+)
+```
+
+The following table provides a description of each field that remains in `df`:
+
+Field Name  | Variable Type | Data Type |  Description | 
+------- | ------- | ------- | ------- 
+`Utilities` | Categorical | String | Type of utilities available. One of `AllPub` (All public Utilities), `NoSewr`	(Electricity, Gas, and Water), `NoSeWa`(Electricity and Gas Only), or `ELO`	Electricity only. 
+`BldgType` | Categorical | String | Type of dwelling. One of `1Fam` (single-family detached), `2FmCon` (two-family conversion; originally built as one-family dwelling),`Duplx`	(duplex), `TwnhsE` (townhouse end unit), `TwnhsI`	(townhouse inside unit).
+`Neighborhood` | Categorical | String |  Physical locations within Ames city limits. One of 25 possible neighborhoods. 
+`OverallCond` | Finite Numeric | Integer | Rates the overall condition of the house (1-10).
+`OverallQual` | Finite Numeric | Integer | Rates the overall material and finish of the house (1-10).
+`TotalBsmtSF` | Continuous Numeric | Integer | Total square feet of basement area.
+`GrLivArea` | Continuous Numeric | Integer | Above grade (ground) living area square feet.
+`YearBuilt` | Continuous Numeric | Integer | Original construction date (YYYY).  
+`YrSold` | Continuous Numeric | Integer | Year Sold (YYYY).
+`SalePrice` | Continuous Numeric | Integer | The property's sale price in dollars. Included as this is the target variable we are trying to predict. 
+
+The fields above were chosen as they provide a decent summary of the different considerations one might make when choosing to buy a home, i.e. (size, type, quality, etc.). 
+
+# Descriptive and Inferential Statistics
+
+The R cell below provides some useful descriptive statistics for the numeric fields in our dataset: 
+
+```{r}
+summary(df %>% dplyr::select(-Utilities, -BldgType))
+```
+
+Already, we can pull out some interesting information: 
+
+* The average `SalePrice` of all homes is around $181,000,
+* The range of dates that the homes were built spans all the way from 1872 to 2010. 
+* The smallest home bought is 334 sq. ft. (Still pretty good by NYC standards!)
+
+The below provides a table of the counts for our categorical variables:
+
+```{r}
+print(table(df$Utilities))
+print(table(df$BldgType))
+print(table(df$Neighborhood))
+```
+
+We see right away from the table above that the variable `Utilities` is the same for all houses except one, and as such will end up having little to no predictive power. As such, it is removed in the cell below:
+
+```{r}
+df <- df %>% 
+    dplyr::select(-Utilities)
+```
+
+From the table of `BldgType`, we see that most of the homes included in this analysis will be single family homes, and that they come from a range of different neighborhoods. 
+
+Next, we can look at the distribution of each of our numeric variables: 
+
+```{r}
+numeric_fields <- df %>%
+  dplyr::select(-BldgType, -Neighborhood)
+
+numeric_fields %>%
+  gather() %>%
+  ggplot(aes(value)) +
+  facet_wrap(~ key, scales = "free") +  
+  geom_histogram(aes(y = ..density..)) + 
+  geom_density() + 
+  theme(
+    axis.text.x=element_blank(),
+    axis.ticks.x=element_blank(),
+    axis.text.y=element_blank(),
+    axis.ticks.y=element_blank())
+
+```
+
+We see that most of the distributions maintain a certain level of normality, with the exception of `YrSold` and `YearBuilt`. In the `YrBuilt` distribution, we can clearly see the presence of the different housing booms experienced by the United States. 
+
+The below creates scatterplots of our numeric fields with the target variable, `SalePrice`: 
+
+```{r}
+sp1 <- ggplot(data=df, aes(OverallCond, SalePrice)) + geom_point() +
+  geom_smooth(method='lm')
+sp2 <- ggplot(data=df, aes(OverallQual, SalePrice)) + geom_point() +
+  geom_smooth(method='lm')
+sp3 <- ggplot(data=df, aes(TotalBsmtSF, SalePrice)) + geom_point() +
+  geom_smooth(method='lm')
+sp4 <- ggplot(data=df, aes(GrLivArea, SalePrice)) + geom_point() +
+  geom_smooth(method='lm')
+sp5 <- ggplot(data=df, aes(YearBuilt, SalePrice)) + geom_point() +
+  geom_smooth(method='lm')
+sp6 <- ggplot(data=df, aes(YrSold, SalePrice)) + geom_point() +
+  geom_smooth(method='lm')
+scatterplots <- list(sp1, sp2, sp3, sp4, sp5, sp6)
+
+grid.arrange(grobs=scatterplots, ncol=2)
+```
+
+Overall, we can see positive correlation with all the chosen explanatory variables with the exception of maybe `YrSold` and `OverallCond`, indicating that most of these variables may prove useful when actually building our model. 
+
+We can check the correlation between the independent by producing a correlation matrix: 
+
+```{r}
+ggpairs(dplyr::select(numeric_fields, -SalePrice), axisLabels = "none")
+```
+
+We see indeed that many of the independent variables (with the exception of `YrSold`) have a non-zero, statistically significant correlation with one another. We can compute the $p$-values and 80% confidence interval of these correlation coefficients below:
+
+```{r}
+numeric_fields <- numeric_fields %>%
+  dplyr::select(-SalePrice)
+
+cor_df <- data.frame(matrix(ncol = 7))
+colnames(cor_df) <- c("key", "x", "y", "p_value", "r", "CI_lower", "CI_upper")
+
+for (i in 1:length(colnames(numeric_fields))){
+  for (j in 1:length(colnames(numeric_fields))){
+    key <- paste(colnames(numeric_fields)[i], 
+                 colnames(numeric_fields)[j], sep='')
+    rev_key <- paste(colnames(numeric_fields)[j], 
+                 colnames(numeric_fields)[i], sep='')
+    p_value <- cor.test(numeric_fields[,i], numeric_fields[,j])$p.value
+    r_value <- cor(numeric_fields[,i], numeric_fields[,j])
+    CI <- CIr(r_value, n=dim(numeric_fields)[1], level=0.8)
+    df_row <- list(
+      key, colnames(numeric_fields)[i], colnames(numeric_fields)[j],
+      p_value, r_value, CI[1], CI[2])
+    if (p_value > 0 & !(rev_key %in% cor_df[,1])) {
+      cor_df <- rbind(cor_df, df_row)
+    }
+  }
+}
+
+cor_df <- tail(cor_df, -1)
+cor_df <- cor_df %>%
+  dplyr::select(-key)
+cor_df
+```
+
+# Evaluate Collinearity Using Precision Matrix
+
+We can get the precision matrix by inverting the correlation matrix:
+
+```{r}
+cor_mat <- unname(cor(numeric_fields))
+precision_mat <- solve(cor_mat)
+```
+
+As expected, multiplying the precision matrix by the correlation matrix returns the identity matrix, given that $AA^{-1} = I$.
+
+```{r}
+round(cor_mat %*% precision_mat)
+round(precision_mat %*% cor_mat)
+```
+
+We can also generate the $LU$ decomposition of the precision matrix:
+
+```{r}
+decomp <- lu.decomposition(precision_mat)
+L <- decomp$L
+U <- decomp$U
+```
+
+Given a matrix $M$, the process of LU decomposition returns a lower triangular matrix $L$ and upper triangular matrix $U$ such that $M = LU$. We can confirm this below by showing that the product $LU$ returns the precision matrix:
+
+```{r}
+round(L %*% U, 5) == round(precision_mat, 5)
+```
+
+The diagonal of the precision matrix provide variance inflation factors (VIF), which provide us with another way to analyze the multicollinearity between the explanatory variables:
+
+* VIF equal to 1 = variables are not correlated.
+* VIF between 1 and 5 = variables are moderately correlated.
+* VIF greater than 5 = variables are highly correlated.
+
+```{r}
+rbind(colnames(numeric_fields), diag(precision_mat))
+```
+
+We can see that there is some level of collinearity among all of our explanatory variables (once again, with the exception of `YrSold`). This is expected, given the high level of correlation that the other variables had with one another. However, VIF is typically a better indicator of collinearity than correlation, and generally it is accepted that predictor variables with VIF values less than 5 are acceptable to use in a linear model. 
+
+# Fitting the Target Variable
+
+A histogram and accompanying density plot estimation of the target variable, `SalePrice`, is shown below:
+
+
+```{r, message=FALSE}
+ggplot(data=df, aes(x=SalePrice)) +
+  geom_histogram(aes(y = ..density..)) + 
+  geom_density() 
+```
+
+Visually, the data appears to look slightly right-skewed, which we can confirm below by showing that the mean is greater than the median:
+
+```{r}
+print(median(df$SalePrice))
+print(mean(df$SalePrice))
+```
+
+As such, it could be appropriate to attempt to fit this the distribution of `SalePrice` to an exponential probability density function (PDF). The exponential distribution, given by the formula below:
+
+$$
+\begin{equation}
+f_X(x) =
+  \begin{cases}
+        \lambda e^{-\lambda x} & \text{if } 0 \leq x < \infty\\
+        0 & \text{otherwise }
+  \end{cases}
+\end{equation}
+$$
+
+only has one parameter $\lamba$ that is required for the fit. The best-fit value of $\lambda$ is determined below using the `fitdistr` function: 
+
+
+```{r}
+l_fit <-unname(fitdistr(df$SalePrice, densfun = 'exponential')$estimate)
+l_fit
+```
+
+We can then use this value of $\lambda$ to simulate the distribution of `SalePrice`, which is done below using 10,000 samples:
+
+
+```{r}
+set.seed(42)
+sim_dist <- rexp(dim(df)[1], rate=l_fit)
+fit_df <- as.data.frame(cbind(sim_dist, df$SalePrice))
+colnames(fit_df) <- c('simulated', 'actual')
+fit_df <- pivot_longer(fit_df, cols=c('simulated', 'actual'), 
+                       names_to = "data_type", values_to = 'value')
+
+ggplot(data=fit_df, aes(x=value, fill=data_type)) +
+  geom_density()
+```
+
+We can in the above that the simulation in this case is not a great approximation of the actual data, likely due to the large numbers in the `SalePrice` field that the exponential distribution is attempting to replicate. We see that the actual data has a much higher peak and shorter tail than the simulated exponential data. 
+
+We can get the theoretical 5th and 95th percentile of the data by integrating the exponential PDF to find the cumulative density function (CDF) $F_X(x)$. This is done below:
+
+$$
+\begin{align}
+F_X(x) &= \int_0^{x} \lambda e^{-\lambda x} \ dx \\
+&= -e^{-\lambda x}\ |_0^{x} \\
+F_X(x) &= 1 - e^{-\lambda x}
+\end{align}
+$$
+
+We can solve for the percentiles $p$ by plugging them into $F_X(x)$, since by definition $F_X(x) = P(X > x)$:
+
+$$
+\begin{align}
+p &= 1 - e^{-\lambda x} \\
+1 - p &= e^{-\lambda x} \\
+\ln(1-p) &= \ln(e^{-\lambda x}) \\
+x &= -\frac{\ln(1-p)}{\lambda}
+\end{align}
+$$
+
+Using the above equation, we solve for the 5th and 95th percentiles:
+
+```{r}
+pct5 <- -log(1-0.05) / l_fit
+pct95 <- -log(1-0.95) / l_fit
+pcts <- c(pct5, pct95)
+rbind(c(5, 95), pcts)
+```
+
+We can compare the above to the empirical 5th and 95th percentiles generated via our simulated distribution:
+
+```{r}
+set.seed(42)
+quantile(sim_dist, probs=c(0.05, 0.95))
+```
+
+Comparing the two the theoretical and empirical yields a solid agreement, which would only improve given a larger number of samples. 
+
+Finally, we can use this empirical distribution to estimate the mean, and provide a 95% confidence interval:
+
+```{r}
+n <- length(sim_dist)
+xbar <- mean(sim_dist)
+s <- sd(sim_dist)
+margin <- qt(0.975,df=n-1)*s/sqrt(n)
+paste(round(xbar, 2), "+/-", round(margin, 2))
+```
+
+We see that despite the fact that the simulated distribution of `SalePrice` wasn't a perfect approximation, it did provide a reasonable estimate of the mean of the actual  actual distribution of `SalePrice`:
+
+```{r}
+mean(df$SalePrice)
+```
+
+# Modelling Sale Price 
+
+## Building Model 
+
+Before building a linear regression model, the cell below converts the two remaining categorical variables `Neighborhood` and `BldgType` into dummy variables, in the hopes unhelpful categories from each can be removed from the model if they are not effective predictors. 
+
+```{r}
+df <- dummy_cols(df, select_columns = c('BldgType', 'Neighborhood'),
+           remove_first_dummy = TRUE, remove_selected_columns =  TRUE)
+```
+
+Now that the dummies variables have been created, the cell below creates a linear regression model to predict `SalePrice` as a function of `BldgType` (dummy variables), `Neighborhood` (dummy variables), `OverallCond`, `OverallQual`, `TotalBsmtSF`, `GrLivArea`,  `YearBuilt`. and `YrSold`:
+
+```{r}
+lm <- lm(SalePrice ~ ., data=df)
+lm_summary <- summary(lm)
+lm_summary
+```
+
+Already we can see that our model produces a more than reasonable adjusted $R^2$ value, definitely assisted by the fact that all of the numeric fields, with the exception of `YrSold`, are listed as statistically significant predictors (this makes sense, given how `YrSold` was the only numeric field that had no significant correlation with the target variable). In terms of our categorical variables, there are a number of building types and neighborhoods that also seem to be effective predictors of target price, but not all of them. The insignificant predictors are removed in the cell below:
+
+```{r}
+mod_summary_sign <- lm_summary$coefficients[ , 4] # get p-values
+remove_list <- names(which(mod_summary_sign > 0.05))
+df <- df %>%
+  dplyr::select(-remove_list[-1])
+```
+
+Next, we can rebuild the model using only the statistically significant predictors:
+
+```{r}
+lm <- lm(SalePrice ~ ., data=df)
+lm_summary <- summary(lm)
+lm_summary
+```
+
+The $R^2$ value remains unchanged despite having reduced the number of features in our model by 17, giving further evidence to the fact that they were insignificant predictors. 
+
+## Testing Assumptions
+
+Before we can use our model to make predictions, we must check that the assumptions of linear regression are true. If not, our model could be unreliable or even misleading. First, the cell below checks again the VIF values for each of our predictor variables, given that they were previously only evaluated using the numeric fields: 
+
+```{r}
+vif(lm)
+```
+
+We see once again that none of the VIF values exceed 5, and thus have levels of collinearity that are acceptable to use in our model. 
+
+The four assumptions of linear regression are the following:
+
+1. *Linear relationship:* There exists a linear relationship between the independent variable, $x$, and the dependent variable, $y$.
+2. *Normality:* The residuals of the model are normally distributed.
+3. *Homoscedasticity:* The residuals have constant variance at every level of $x$.
+4. *Independence*: The residuals are independent. In particular, there is no correlation between consecutive residuals in time series data.
+
+### Linear Relationship
+
+The scatterplots created earlier show that all of the numeric fields appear to exhibit a linear relationship with the exception of `YrSold`, which has now been removed from the model. We can assume that the linear relationship is met for our remaining dummy categorical variables, since each field only contains two values (0 or 1), and we can fit a straight line perfectly to any two points.
+
+### Normality
+
+To check if the residuals are normally distributed, we can make a histogram:
+
+```{r}
+ggplot(lm, aes(x = .resid)) +
+  geom_histogram(binwidth = 7500) 
+```
+
+While the histogram does indeed appear to be noramally distributed, we can further analyze by use of a Q-Q (quantile-quantile) plot:
+
+```{r}
+ggplot(data = lm, aes(sample = .resid)) +
+  stat_qq()
+```
+
+The QQ plot reveals that while the data appears normal for the majority of the distribution, there are some outliers at either end resulting in deviance from an otherwise seemingly straight line. However, given that the vast majority of the data does indeed to follow a normal distribution, we can consider this assumption satisfied. 
+
+### Homoscedasticity
+
+To check if the homoscedasticity condition is met, we can create a plot of the residuals as a function of the fitted values:
+
+```{r}
+ggplot(lm, aes(x = .fitted, y = .resid)) +
+  geom_point() +
+  geom_hline(yintercept = 0)
+```
+
+While the distribution of residuals looks somewhat equal across all fitted values, there does appear to be a wider spread towards the right side of the plot. This is once again, due to the presence of a number of residual observations that result in a deviance from an otherwise unitersting residual plot. However, since this deviation only occurs towards the far right side of the plot, we can consider the Homoscedasticity assumption satisfied. 
+
+### Independence
+
+Based off the above residual plot above, we can also confirm that there is not a strong correlation between the residuals and fitted values. This is further evidenced by the fact that the correlation coefficient between the two is very close to 0:
+
+```{r}
+cor(lm$residuals, lm$fitted.values)
+```
+
+As such, we confirm that the final linear regression assumption model is met.
+
+## Make Predictions
+
+Now that we have confirmed that our model meets all the assumptions of linear regression, we can use it to evaluate performance on our testing set:
+
+```{r}
+test_df <- read.csv("Data/test.csv")
+id_field <- test_df['Id']
+test_df <- test_df %>% dplyr::select(
+  BldgType, Neighborhood, OverallCond, OverallQual, 
+  TotalBsmtSF, GrLivArea, YearBuilt, YrSold
+)
+
+
+test_df <- dummy_cols(test_df, select_columns = c('BldgType', 'Neighborhood'),
+                      remove_first_dummy = TRUE, 
+                      remove_selected_columns =  TRUE)
+
+test_df <- test_df %>%
+  dplyr::select(-remove_list[-1])
+
+preds <- predict(lm, test_df)
+```
+
+The above sets up the testing data in the same way as the test data, and then uses it to create predictions, which are stored in `preds`. The cell below then creates a dataframe of these predictions that can be used to create a `.csv` file that can be uploaded to Kaggle. 
+
+```{r}
+preds <- cbind(id_field, preds)
+preds <- data.frame(preds)
+colnames(preds) <- c('Id', 'SalePrice')
+
+# one prediction comes out NaN due to a NaN TotalBsmtSF value in the test
+# dataset. Code below replaces this preidciton with the mean prediction value.
+preds <- replace(preds,is.na(preds),mean(preds[is.na(preds) == FALSE]))
+
+# write predictions to file
+write_csv(preds, file="prediction.csv")
+```
+
+The predictions created above result in a Kaggle score of 0.22216.
+
+## Extra - Rebuilding the Model with No Outliers
+
+Though we have no tangible reason to exclude them, it is worth noting that there were a number of outliers in our dataset that were clearly visible when checking the linear regression assumptions. We can visualize these outliers by using a metric known as Cook's distance, which can be used to determine how much influence a single data point holds over a model's performance [by measuring how that model's predicted values would change if it didn't exist](https://www.jstor.org/stable/1268249). As such, it can be used to identify and remove problematic outliers. Typically, the threshold used for removal is if Cook's distance is greater than $\frac{4}{n}$, where $n$ is the number of observations in our dataset:
+
+```{r, warning=FALSE}
+cooksD <- cooks.distance(lm)
+cooks <- as.data.frame(cooksD)
+colnames(cooks) <- c('d_c')
+cooks$row_num <- seq.int(nrow(cooks)) 
+
+ggplot(data = cooks, aes(x = row_num, y = d_c)) + 
+  geom_point(size =  1) +
+    geom_hline(yintercept = 4 / nrow(df), color = "red") +
+      labs(
+        x = "Index",
+        y = "Cook's Distance"
+      ) + 
+        ylim(0, 0.01)
+```
+
+The cell below rebuilds our linear model with after first removing these outlier observations from the training set: 
+
+```{r}
+cooksD <- cooks.distance(lm)
+influential <- cooksD[(cooksD > (3 * mean(cooksD, na.rm = TRUE)))]
+df <- df[-(as.integer(names(influential))),]
+
+lm <- lm(SalePrice ~ ., data=df)
+lm_summary <- summary(lm)
+lm_summary$r.squared
+```
+
+As expected, we see that the $R^2$ value has increased, as the model is now likely better fitting to the non-outlier values. 
+
+We can also see that there is no question of our linear regression assumptions being met by recreating the residual plots:
+
+```{r}
+ggplot(lm, aes(x = .resid)) +
+  geom_histogram(binwidth = 7500) 
+
+ggplot(data = lm, aes(sample = .resid)) +
+  stat_qq()
+
+ggplot(lm, aes(x = .fitted, y = .resid)) +
+  geom_point() +
+  geom_hline(yintercept = 0)
+```
+
+However, when recreating the predictions using this outlier free model on the testing set: 
+
+```{r}
+preds <- predict(lm, test_df)
+preds <- cbind(id_field, preds)
+preds <- data.frame(preds)
+colnames(preds) <- c('Id', 'SalePrice')
+preds <- replace(preds,is.na(preds),mean(preds[is.na(preds) == FALSE]))
+write_csv(preds, file="prediction.csv")
+```
+
+it results in a much worse Kaggle score of 0.45855. Thus, despite the higher $R^2$ and perfect-looking residual plots, the exclusion of the outliers resulted in a model that was worse at making predictions using new data. 
+
+# Conclusion 
+

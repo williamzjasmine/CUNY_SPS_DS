@@ -285,5 +285,4 @@ $$
 
 Thus, to summarize, we have confirmed using the exponential distribution's moment generating function that: $E[X] = \mu = \frac{1}{\lambda}$ and $\sigma^2 = \frac{1}{\lambda^2}$.
 
-
-
+--

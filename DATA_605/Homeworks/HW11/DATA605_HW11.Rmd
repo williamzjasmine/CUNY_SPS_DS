@@ -99,7 +99,7 @@ ggplot(lin_reg, aes(x = .fitted, y = .resid)) +
   geom_hline(yintercept = 0)
 ```
 
-While the distribution of residuals looks somewhat equal accross all fitted values, there does appear to be a wider spread towards the right side of the plot. Since the visual analysis does not provide full confidence that this assumption is met, we can confirm statistically via a [Breusch-Pagan](https://search.r-project.org/CRAN/refmans/lmtest/html/bptest.html) test. The alternative hypothesis of this test is that the distribution of the variance of the residuals differs for different values of $y$ (i.e. the data is not homoskedastic), and thus, once again, the desired result of the test is to obtain a $p$-value > 0.05:
+While the distribution of residuals looks somewhat equal across all fitted values, there does appear to be a wider spread towards the right side of the plot. Since the visual analysis does not provide full confidence that this assumption is met, we can confirm statistically via a [Breusch-Pagan](https://search.r-project.org/CRAN/refmans/lmtest/html/bptest.html) test. The alternative hypothesis of this test is that the distribution of the variance of the residuals differs for different values of $y$ (i.e. the data is not homoskedastic), and thus, once again, the desired result of the test is to obtain a $p$-value > 0.05:
 
 ```{r}
 bptest(lin_reg)

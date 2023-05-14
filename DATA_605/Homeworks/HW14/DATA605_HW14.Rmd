@@ -1,0 +1,284 @@
+---
+title: "Data 605 HW14"
+author: "William Jasmine"
+date: "2023-05-04"
+output:
+  html_document:
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+  pdf_document: default
+---
+
+# Functions and Imports 
+
+The code below imports the necessary packages, and defines a function that can be used to graph Taylor Expansion estimates. 
+
+```{r}
+library(pracma)
+
+
+graph_taylor <- function(f_to_approximate, a, x_min, x_max){
+  
+  # f_to_approximate: function to find expansion of.
+  # a: center point of taylor expansion.
+  # x_min: min x value to estimate.
+  # x_max: max x value to estimate. 
+  
+  xs <- seq(x_min, x_max, 0.01)
+  fx <- f(xs)
+
+  plot(xs,fx,type="l",col="red")
+
+  for(n in 1:8) {
+    fx_T <- c()
+    for(i in 1:length(xs)){
+      coefs <- rev(taylor(f_to_approximate, a, n))
+      est <- polyval(coefs, xs[i])
+      est <- 0 
+      for(j in 1:length(coefs)){
+        est <- est + (coefs[j] * xs[i]^(j-1))
+      }
+      fx_T[i] <- est
+    }
+    lines(xs,fx_T,col="green")
+  }
+
+  lines(xs,fx,type="l",col="red")
+}
+```
+
+# Description 
+
+This assignment focuses on finding the Taylor Series expansions of the following functions:
+
+* $f(x) = \frac{1}{1-x}$
+* $f(x) = e^x$
+* $f(x) = \ln{(1+x)}$
+* $f(x) = \sqrt{x}$
+
+# Definitions
+
+The Taylor Series expansion of $f(x)$ centered at (or about) a point $x=a$, is defined as the following:
+
+$$
+\begin{equation}
+TSE(f) = \sum_{n=0}^{\infty} \frac{f^{(n)}(a)}{n!}(x-a)^n
+\end{equation}
+$$
+
+From the definition of above, it is clear that a Taylor expansion for $f(x)$ only exists given that $f(x)$ is infinitely differentiable at $a$. 
+
+Furthermore, once a Taylor Series expansion has been determined for $f(x)$ centered at $a$, we can say that $f(x) = TSE(f)$ on the interval for which $TSE(f)$ converges. To find the interval of convergence $l$ of a sum we can use the ratio test. To perform a ratio test, assume a power series $\sum a_n$ and define:
+
+$$
+L = \lim_{n\to\infty}\left| \frac{a^{n+1}}{a^n} \right|
+$$
+
+The ratio test says that:
+
+1. If $L < 1$, the series is absolutely convergent (converges everywhere).
+2. If $L > 1$, the series is divergent.
+3. If $L = 1$, the series may be divergent, conditionally convergent, or absolutely convergent. 
+
+
+Thus, we can use the above to determine the interval over which a function is exactly equal to its Taylor Series expansion (in the limit that $n \to \infty$.)
+
+
+# Function 1 
+
+## Derive Exspansion
+
+First, we find the Taylor Series expansion for $f(x) = \frac{1}{1-x}$. We will choose $a=0$ as the center point, given that $f(x)$ is differentiable at this point. To assist in computing the first few terms of the sum, the table below tracks the different values of $f^{(n)}(x)$ and $f^{(n)}(a)=f^{(n)}(0)$ for the first few values of $n$:
+
+$n$  | $n!$ | $f^{(n)}(x)$ | $f^{(n)}(0)$ 
+------- | ------- | ------- | -------
+0 | 1 | $\frac{1}{1-x}$ | 1
+1 | 1 | $\frac{1}{(1-x)^2}$ | 1 
+2 | 2 | $\frac{2}{(1-x)^3}$ | 2
+3 | 6 | $\frac{6}{(1-x)^4}$ | 6
+
+Thus, the Taylor Series expansion of $f(x)$ is: 
+
+$$
+\begin{align}
+TSE(f) &=  \frac{1}{1}(x-0)^0 + \frac{1}{1}(x-0)^1 + \frac{2}{2}(x-0)^2 + \frac{6}{6}(x-0)^3 + \ ...\\
+&= 1 + x + x^2 + x^3 + \ ... \\
+&= \sum_{n=0}^{\infty}x^n
+\end{align}
+$$
+
+We can determine the interval of convergence of this sum by applying the ratio test: 
+
+
+$$
+\begin{align}
+L &= \lim_{n\to\infty}\left| \frac{a^{n+1}}{a^n} \right| \\
+&= \lim_{n\to\infty}\left| \frac{x^{n+1}}{x^n} \right| \\
+&= \lim_{n\to\infty}\left| x \right| \\
+&= |x|
+\end{align}
+$$
+
+Thus, the series converges when $|x| < 1$, or $-1 < x < 1$. Thus, $f(x) = \frac{1}{1-x} =\sum_{n=0}^{\infty}x^n$ on the interval $(-1, 1)$.
+
+## Graph Estimate
+
+The following code produces a graph of the function $f(x) = \frac{1}{1+x}$ in red, along with its Taylor Series approximations using 1 up to 8 terms (in green) and $x=0$ as the center point. 
+
+```{r}
+f <- function(x) {
+  return(1 / (1+x))
+}
+
+graph_taylor(f, 0, -0.5, 0.5)
+```
+
+# Function 2
+
+## Derive Exspansion
+
+To find the Taylor Series expansion for $f(x) = e^x$, we can repeat the same process from that was used for the previous function. Once again, we will choose $a=0$ as the center point, given that $f(x)$ is differentiable at this point. The chart: 
+
+$n$  | $n!$ | $f^{(n)}(x)$ | $f^{(n)}(0)$ 
+------- | ------- | ------- | -------
+0 | 1 | $e^x$ | 1
+1 | 1 | $e^x$ | 1 
+2 | 2 | $e^x$ | 1
+3 | 6 | $e^x$ | 1
+
+Thus, the Taylor Series expansion of $f(x)$ is: 
+
+$$
+\begin{align}
+TSE(f) &=  \frac{1}{1}(x-0)^0 + \frac{1}{1}(x-0)^1 + \frac{1}{2}(x-0)^2 + \frac{1}{6}(x-0)^3 + \ ...\\
+&= 1 + x + \frac{x^2}{2} + \frac{x^3}{6} + \ ... \\
+&= \sum_{n=0}^{\infty}\frac{x^n}{n!}
+\end{align}
+$$
+
+We can determine the interval of convergence of this sum by applying the ratio test: 
+
+$$
+\begin{align}
+L &= \lim_{n\to\infty}\left| \frac{a^{n+1}}{a^n} \right| \\
+&= \lim_{n\to\infty}\left| \frac{x^{n+1}}{(n+1)!}\cdot \frac{n!}{x^n} \right| \\
+&= \lim_{n\to\infty}\left| \frac{x}{n+1} \right| \\
+&= 0
+\end{align}
+$$
+
+Since $L<1$, we know that the Taylor Series expansion of $e^x$ converges everywhere.  Thus, $f(x) = e^x =\sum_{n=0}^{\infty}\frac{x^n}{n!}$ on the interval $(-\infty, \infty)$ (in other words, they're always equal).
+
+## Graph Estimate
+
+The following code produces a graph of the function $f(x) = e^x$ in red, along with its Taylor Series approximations using 1 up to 8 terms (in green) and $x=0$ as the center point. 
+
+```{r}
+f <- function(x) {
+  return(exp(x))
+}
+
+graph_taylor(f, 0, -5, 5)
+```
+
+# Function 3
+
+## Derive Expansion
+
+We repeat the process again for the function $f(x) = \ln(1+x)$, once again centering on $x=0$:
+
+$n$  | $n!$ | $f^{(n)}(x)$ | $f^{(n)}(0)$ 
+------- | ------- | ------- | -------
+0 | 1 | $\ln{(1+x)}$ | 0
+1 | 1 | $\frac{1}{1+x}$ | 1
+2 | 2 | $-\frac{1}{(1+x)^2}$ | -1
+3 | 6 | $\frac{2}{(1+x)^3}$ | 2
+4 | 24 | $-\frac{6}{(1+x)^4}$ | -6
+
+Thus, the Taylor Series expansion of $f(x)$ is: 
+
+$$
+\begin{align}
+TSE(f) &=  \frac{0}{1}(x-0)^0 + \frac{1}{1}(x-0)^1 - \frac{1}{2}(x-0)^2 + \frac{2}{6}(x-0)^3 + \frac{6}{24}(x-0)^4\ ...\\
+&= 0 + x - \frac{1}{2}x^2 + \frac{1}{3}x^3 + \frac{1}{4}x^4\ ...\\\\
+&= \sum_{n=1}^{\infty}(-1)^{n+1}\frac{x^n}{n}
+\end{align}
+$$
+
+We can determine the interval of convergence of this sum by applying the ratio test: 
+
+$$
+\begin{align}
+L &= \lim_{n\to\infty}\left| \frac{a^{n+1}}{a^n} \right| \\
+&= \lim_{n\to\infty}\left| \frac{(-1)^{n+2}x^{n+1}}{n+1}  \cdot \frac{n}{(-1)^{n+1}x^n} \right| \\
+&= \lim_{n\to\infty}\left| -\frac{xn}{n+1} \right| \\
+&= |-x| \\
+&= |x| 
+\end{align}
+$$
+
+From function 1, we already know this means the sum converges on the interval $(-1, 1)$. Thus, $f(x) = \ln(1+x) =\sum_{n=1}^{\infty}(-1)^{n+1}\frac{x^n}{n}$ on the interval $(-1, 1)$.
+
+## Graph Estimate
+
+The following code produces a graph of the function $f(x) = \ln{(1+x)}$ in red, along with its Taylor Series approximations using 1 up to 8 terms (in green) and $x=0$ as the center point. 
+
+```{r}
+f <- function(x) {
+  return(log(1 + x))
+}
+
+graph_taylor(f, 0, -2, 2)
+```
+
+# Function 4
+
+## Derive Expansion
+
+The function $f(x)=\sqrt{x}$ is not differentiable at 0, and thus for this function we will instead use $a=1$: 
+
+
+$n$  | $n!$ | $f^{(n)}(x)$ | $f^{(n)}(1)$ 
+------- | ------- | ------- | -------
+0 | 1 | $x^{1/2}$ | 1
+1 | 1 | $\frac{1}{2x^{1/2}}$ | $\frac{1}{2}$
+2 | 2 | $-\frac{1}{4x^{3/2}}$ | $-\frac{1}{4}$
+3 | 6 | $\frac{3}{8x^{5/2}}$ | $\frac{3}{8}$
+4 | 24 | $\frac{15}{16x^{7/2}}$ | $-\frac{15}{16}$
+
+Thus, the Taylor Series expansion of $f(x)$ is: 
+
+$$
+\begin{align}
+TSE(f) &=  \frac{1}{1}(x-1)^0 + \frac{1}{2}\cdot\frac{1}{1!}(x-1)^1 - \frac{1}{4}\cdot\frac{1}{2!}(x-1)^2 + \frac{3}{8}\cdot\frac{1}{3!}(x-1)^3 - \frac{15}{16}\cdot\frac{1}{4!}(x-1)^4 \ ...\\
+&= 1 + \frac{1}{2}(x-1) + \sum_{n=2}^{\infty}(-1)^{n-1}\frac{2n-3}{2^nn!}(x-1)^n \\
+\end{align}
+$$
+
+Note that the $2n-3$ term in the sum comes from the sequence $1, 3, 15, \ ...$ when $n \geq 2$. We can determine the interval of convergence of this sum by applying the ratio test: 
+
+$$
+\begin{align}
+L &= \lim_{n\to\infty}\left| \frac{a^{n+1}}{a^n} \right| \\
+&= \lim_{n\to\infty}\left| \frac{(-1)^n(2n-1)(x-1)^{n+1}}{2^{n+1}(n+1)!}  \cdot \frac{{2^nn!}}{(-1)^{n-1}(2n-3)(x-1)^n} \right| \\
+&= \lim_{n\to\infty}\left| -\frac{xn}{n+1} \right| \\
+&= \lim_{n\to\infty}\left| -(x-1)\frac{2n-1}{2n+2} \right| \\
+&= |-x+1| 
+\end{align}
+$$
+
+Thus, the sum converges if $|-x+1| < 1$, or $-x+1 < 1 \rightarrow x > 0$ and $-x+1 > -1 \rightarrow x < 2$. Thus, $f(x) = \sqrt{x} = 1 + \frac{1}{2}(x-1) + \sum_{n=2}^{\infty}(-1)^{n-1}\frac{2n-3}{2^nn!}(x-1)^n$ on the interval $(0, 2)$.
+
+## Graph Estimate
+
+The following code produces a graph of the function $f(x) = \sqrt{x}$ in red, along with its Taylor Series approximations using 1 up to 8 terms (in green) and $x=1$ as the center point. 
+
+```{r}
+f <- function(x) {
+  return(log(1 + x))
+}
+
+graph_taylor(f, 1, 0.01, 1.99)
+```

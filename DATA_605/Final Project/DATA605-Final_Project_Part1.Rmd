@@ -1,0 +1,466 @@
+---
+title: "Data 605 - Final Project - Part 1"
+author: "William Jasmine"
+date: "2023-05-17"
+output:
+  html_document:
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+  pdf_document: default
+---
+
+# Introduction/Set Up
+**Probability Density 1:  $X$~$\Gamma$**  
+
+Using R, generate a random variable $X$ that has 10,000 random $\Gamma$ PDF values. A $\Gamma$ PDF is completely described by $n$ (a size parameter) and $\lambda$ (a shape parameter). Choose any $n$ greater 3 and an expected value $\lambda$ between 2 and 10 (you choose).  
+
+**Probability Density 2:  $Y$~Sum of Exponentials**  
+
+Then generate 10,000 observations from  the sum of $n$ exponential PDFs with rate/shape parameter $\lambda$. The $n$ and $\lambda$ must be the same as in the previous case. (e.g., `mysum=rexp(10000,lambda)+rexp(10000,lambda)+..`)
+
+**Probability Density 3:  $Z$~Exponential** 
+
+Then generate 10,000 observations from  a single exponential PDF with rate/shape parameter $\lambda$. 
+
+NOTE: The Gamma distribution is quite common in data science.  For example, it is used to model failures for multiple processes when each of those processes has the same failure rate.  The exponential is used for constant failure rates, service times, etc.  
+
+---
+
+The three distributions, $X, Y$, and $Z$, are created below empirically using parameters $n$=10 and $\lambda=5$:
+
+```{r}
+set.seed(2023)
+
+samples <- 10000
+n <- 6
+l <- 2
+
+X <- rgamma(samples, shape=n, rate=l)
+Y <- rexp(samples, rate=l)
+for(i in 1:(n-1)){
+  Y <- Y + rexp(samples, rate=l)
+}
+Z <- rexp(samples, rate=l)
+```
+
+# Part A
+## Description
+Calculate the empirical expected value (means) and variances of all three PDFs.  
+
+## Solution
+
+The code below calculates and displays the means and standard deviations of the three probability distributions:
+
+```{r}
+pdfs <- cbind(X, Y, Z)
+means <- apply(pdfs, 2, mean)
+vars <- apply(pdfs, 2, var)
+
+cbind(means, vars)
+```
+
+# Part B 
+## Description 
+
+Using calculus, calculate the expected value and variance of the Gamma pdf ($X$).
+
+Using the moment generating function for exponentials, calculate the expected value of the single exponential ($Z$) and the sum of exponentials ($Y$).
+
+## Solution 
+
+The Gamma probability distribution $g_X$ is given as the following: 
+
+$$
+\begin{equation}
+g_X(x, n, \lambda) =
+  \begin{cases}
+        \frac{\lambda^n}{\Gamma(n)}x^{n-1}e^{-\lambda x} & \text{if } 0 \leq x < \infty\\
+        0 & \text{otherwise }
+  \end{cases}
+\end{equation}
+$$
+
+where $n$ and $\lambda$ are the parameters described above, and $\Gamma(n) = (n-1)!$ is the Gamma function. The expectation value $E(X)$ of a probability distribution function $f(x)$ is defined as $E(x) = \int x \cdot f(x) \ dx$. Thus, to determine the expectation value of $g_X$, we can solve the following:
+
+$$
+\begin{equation}
+E(X) = \int_0^{\infty} \frac{\lambda^n}{\Gamma(n)}x^{n-1}e^{-\lambda x} \cdot x \ dx
+\end{equation}
+$$
+
+Because this is a difficult to solve integral using brute force, we can use some algebraic manipulation to make it much simpler. The first step involves pulling a out a $\frac{1}{\lambda}$:
+
+$$
+\begin{equation}
+E(X) = \int_0^{\infty} \frac{1}{\lambda}\frac{\lambda^{n+1}}{\Gamma(n)}x^{n-1}e^{-\lambda x} \cdot x \ dx
+\end{equation}
+$$
+
+Next, we use that fact that $\Gamma(n) = \frac{\Gamma(n+1)}{n}$ to pull out a $n$:
+
+$$
+\begin{equation}
+E(X) = \int_0^{\infty} \frac{n}{\lambda}\frac{\lambda^{n+1}}{\Gamma(n+1)}x^{n-1}e^{-\lambda x} \cdot x \ dx
+\end{equation}
+$$
+
+Next, we combine the $x$ terms, and pull out the constant $\frac{n}{\lambda}$:
+
+$$
+\begin{equation}
+E(X) = \frac{n}{\lambda} \int_0^{\infty} \frac{\lambda^{n+1}}{\Gamma(n+1)}x^{(n+1)-1}e^{-\lambda x} \ dx
+\end{equation}
+$$
+
+While this method of combining exponents in the $x$ term might seem strange, the reason for it is due to the fact that the integrand now represents its own Gamma probability distribution function with parameters $n+1$ and $\lambda$. Thus, we can substitute the entire integrand as follows: 
+
+$$
+\begin{equation}
+E(X) =\frac{n}{\lambda} \int_0^{\infty} g_X(x, n+1, \lambda) \ dx
+\end{equation}
+$$
+
+Since the integral of any probability distribution over its range of values is equal to 1, we can conclude for the Gamma probability distribution that:
+
+$$
+\begin{equation}
+E(X) = \frac{n}{\lambda}
+\end{equation}
+$$
+
+Next, we can find the variance of the Gamma probability distribution using the fact that $\sigma^2 = E(X^2) - E(X)^2$. However, we must first find $E(X^2)$, which, given a probability density function $f(x)$ is defined as: $E(X^2) = \int f(x) \cdot x^2$:
+
+$$
+\begin{equation}
+E(X^2) = \int_0^{\infty} \frac{\lambda^n}{\Gamma(n)}x^{n-1}e^{-\lambda x} \cdot x^2 \ dx
+\end{equation}
+$$
+The steps of solving this integral are quite similar to the ones shown above, and are shown below:
+
+$$
+\begin{align}
+E(X) &= \int_0^{\infty} \frac{1}{\lambda^2}\frac{\lambda^{n-2}}{\Gamma(n)}x^{n-1}e^{-\lambda x} \cdot x^2 \ dx \\
+E(X) &= \int_0^{\infty} \frac{1}{\lambda^2}\frac{\lambda^{n-2}}{\Gamma(n)}x^{n-1}e^{-\lambda x} \cdot x^2 \ dx \\
+E(X) &= \int_0^{\infty} \frac{n(n+1)}{\lambda^2}\frac{\lambda^{n-2}}{\Gamma(n+2)}x^{n-1}e^{-\lambda x} \cdot x^2 \ dx \\
+E(X) &= \frac{n(n+1)}{\lambda^2}\int_0^{\infty} \frac{\lambda^{n-2}}{\Gamma(n+2)}x^{(n+2)-1}e^{-\lambda x} \ dx \\
+E(X) &= \frac{n(n+1)}{\lambda^2}\int_0^{\infty} g_X(x, n+2, \lambda) \ dx \\
+E(X) &= \frac{n(n+1)}{\lambda^2}
+\end{align}
+$$
+
+Thus, we can finally compute the variance $\sigma^2$ as follows:
+
+$$
+\begin{align}
+\sigma^2 &= E(X^2) - E(X)^2 \\
+\sigma^2 &= \frac{n^2+n}{\lambda^2} - \frac{n^2}{\lambda^2} \\
+\sigma^2 &= \frac{n}{\lambda^2} 
+\end{align}
+$$
+
+Using the values of $n$ and $\lambda$ chosen in part 1A, we get that $E(X) = \frac{n}{\lambda} = 10/5 = 2$ and $\sigma^2 = \frac{n}{\lambda^2} = \frac{10}{25}=0.4$. These are very close to the empirically calculated values for the $X$ probability distribution in part 1A.
+
+---
+
+The exponential probability distribution is defined as follows:
+
+$$
+\begin{equation}
+f_X(x) =
+  \begin{cases}
+        \lambda e^{-\lambda x} & \text{if } 0 \leq x < \infty\\
+        0 & \text{otherwise }
+  \end{cases}
+\end{equation}
+$$
+
+In homework 9, we defined the moment generating function $M_X(t)$ of $f_X(x)$ to be:
+
+$$
+\begin{align}
+M_X(t) &= \frac{\lambda}{\lambda - t}
+\end{align}
+$$
+
+Given that $E[X] = M'_X(0)$, we can use this moment generating function to determine the expected value of the exponential distribution. To start we take the first derivative of $M_X(t)$:
+
+
+$$
+\begin{align}
+M'_X(t) &= \frac{d}{dt}\left( \frac{\lambda}{\lambda - t} \right) \\
+M'_X(t) &= \frac{\lambda}{(\lambda-t)^2} \\
+\end{align}
+$$
+
+We can now plug 0 into the above to find $E(X)$:
+
+$$
+\begin{align}
+E[X] &= M'_X(0) \\
+E[X] &= \frac{\lambda}{(\lambda-0)^2} \\
+E[X] &= \frac{\lambda}{\lambda^2} \\
+E[X] &= \frac{1}{\lambda} \\
+\end{align}
+$$
+
+We see indeed that the that mean of the $Z$ distribution from part 1A is very close to $\frac{1}{\lambda} = \frac{1}{5} = 0.2$.
+
+The distribution $Y$ from part 1A is just a sum of $n$ exponential random variables: $Y = \sum_1^n Z$. Because the expected value of the sum of several random variables is equal to the sum of their expectations (i.e. $E[U+W] = E[W] + E[U]$), the expected value of $Y$ (a distribution that represents the sum of $n$ exponential random variables) can be written as:
+
+$$
+\begin{align}
+E[Y] &= \sum_1^n E[Z] \\
+E[Y] &= \sum_1^n \frac{1}{\lambda} \\
+E[Y] &= \frac{n}{\lambda} 
+\end{align}
+$$
+
+Note that this is exactly the same expression that represents the expected value of a Gamma probability distribution. Thus, a Gamma probability distribution with size parameter $n$ has exactly the same expected value as a probability distribution that represents the sum of $n$ exponential random variables. Looking at the mean of $Y$ from part 1A, we see that is indeed very close to $\frac{n}{\lambda} = \frac{10}{5}=2$.
+
+# Part C   
+
+## Description 
+
+For PDF $Z$ (the exponential), calculate empirically the probability $P(Z > \lambda \ | \  Z > \lambda/2)$.  Then evaluate through calculus whether the memoryless property holds.
+
+## Solution
+
+Using Baye's rule, the conditional probability $P(A | B)$ is defined as:
+
+$$
+P(A|B) = \frac{P(B|A) \cdot P(A)}{P(B)}
+$$
+
+In this case, $P(B|A) = P(Z > \lambda/2 \ |\  Z > \lambda) = 1$, since if $Z$ is greater than $\lambda$ it must be greater than $\lambda / 2$. Thus, we can easily compute $P$ in the cell below:
+
+
+```{r}
+P_A <- length(which(Z > l)) / samples
+P_B <- length(which(Z > l/2)) / samples
+P <- P_A / P_B
+
+# alternative method using subsets to check above value of P
+check <- length(which(Z[Z>l/2] > l)) / length(Z[Z>l/2])
+
+if(P == check){
+  print(P)
+}
+```
+
+Thus, $P(Z > \lambda \ | \  Z > \lambda/2) \approx 0.133$. 
+
+Given a continuous random variable $X$, its associated probability distribution is considered "memoryless" if $P(X > r + s\ |\  X > r) = P(X >s).$ For this example, we can confirm that the exponential distribution adheres to the this memoryless property if $P(Z > \frac{\lambda}{2} + \frac{\lambda}{2}\ |\ Z > \frac{\lambda}{2}) = P(Z > \frac{\lambda}{2})$. In other words, we must prove that:
+
+$$
+\begin{equation}
+\frac{P(Z > \lambda)}{P(Z > \lambda/2)} = P(Z > \lambda/2)
+\end{equation}
+$$
+To determine $P(Z > \lambda)$ we can solve the following integral:
+
+$$
+\begin{align}
+P(Z > \lambda) &= 1 - \int_0^{\lambda} \lambda e^{-\lambda x} \ dx \\
+&= 1 - (-e^{-\lambda x}|_0^\lambda) \\
+&= 1 - (-e^{-\lambda^2}-1) \\
+&= e^{-\lambda^2}
+\end{align}
+$$
+
+We can invoke the same methodology to determine $P(Z > \lambda/2)$:
+
+$$
+\begin{align}
+P(Z > \lambda/2) &= 1 - \int_0^{\lambda / 2} \lambda e^{-\lambda x} \ dx \\
+&= 1 - (-e^{-\lambda x}|_0^{\lambda/2}) \\
+&= 1 - (-e^{\frac{-\lambda^2}{2}}-1) \\
+&= e^{\frac{-\lambda^2}{2}}
+\end{align}
+$$
+
+Dividing $\frac{P(Z > \lambda)}{P(Z > \lambda/2)}$ gives:
+
+$$
+\begin{align}
+\frac{P(Z > \lambda)}{P(Z > \lambda/2)} = \frac{e^{-\lambda^2}} {e^\frac{-\lambda^2}{2}}=e^{-\lambda^2+\frac{\lambda^2}{2}} = e^{\frac{-\lambda^2}{2}} = P(Z > \lambda/2)
+\end{align}
+$$
+
+Thus, we have confirmed the exponential distribution's memoryless trait for this conditional probability. 
+
+# Part D
+
+## Description 
+
+For PDF $Z$ (the exponential), calculate empirically the probability $P(Z > 2\lambda \ | \  Z > \lambda)$.  Then evaluate through calculus whether the memoryless property holds.
+
+## Solution
+
+We can determine the probability by mimicking the steps used in part 1C. Once again we can use Baye's rule with the helpful addition that $P(B|A) = P(Z > \lambda \ |\  Z > 2\lambda) = 1$, since if $Z$ is greater than $2\lambda$ it must be greater than $\lambda$. $P$ is computed in the cell below:
+
+```{r}
+P_A <- length(which(Z > 2*l)) / samples
+P_B <- length(which(Z > l)) / samples
+P <- P_A / P_B
+
+# alternative method using subsets to check above value of P
+check <- length(which(Z[Z>l] > 2*l)) / length(Z[Z>l])
+
+if(P == check){
+  print(P)
+}
+```
+
+Thus, $P(Z > \lambda \ | \  Z > \lambda/2) \approx 0.167$. 
+
+Following in the same footsteps as in part 1C, we can show adherence of the memoryless property for this probability by proving that:
+
+$$
+\begin{equation}
+\frac{P(Z > 2\lambda)}{P(Z > \lambda)} = P(Z > \lambda)
+\end{equation}
+$$
+To determine $P(Z > 2\lambda)$ we can solve the following integral:
+
+$$
+\begin{align}
+P(Z > \lambda) &= 1 - \int_0^{2\lambda} \lambda e^{-\lambda x} \ dx \\
+&= 1 - (-e^{-\lambda x}|_0^{2\lambda}) \\
+&= 1 - (-e^{-2\lambda^2}-1) \\
+&= e^{-2\lambda^2}
+\end{align}
+$$
+
+We have already determined $P(Z > \lambda)$ in part 1C, and so can immediately compute $\frac{P(Z > 2\lambda)}{P(Z > \lambda)}$:
+
+$$
+\begin{align}
+\frac{P(Z > 2\lambda)}{P(Z > \lambda)} = \frac{e^{-2\lambda^2}} {e^{-\lambda^2}}=e^{-2\lambda^2+\lambda^2} = e^{-\lambda^2} = P(Z > \lambda)
+\end{align}
+$$
+
+Thus, we have confirmed the exponential distribution's memoryless trait for this conditional probability. 
+
+# Part E
+
+## Description 
+
+For PDF $Z$ (the exponential), calculate empirically the probability $P(Z > 3\lambda \ | \  Z > \lambda)$.  Then evaluate through calculus whether the memoryless property holds.
+
+## Solution
+
+We can determine the probability by mimicking the steps used in parts 1C and 1D. Once again we can use Baye's rule with the helpful addition that $P(B|A) = P(Z > \lambda \ |\  Z > 3\lambda) = 1$, since if $Z$ is greater than $3\lambda$ it must be greater than $\lambda$. $P$ is computed in the cell below:
+
+```{r}
+P_A <- length(which(Z > 3*l)) / samples
+P_B <- length(which(Z > l)) / samples
+P <- P_A / P_B
+
+# alternative method using subsets to check above value of P
+check <- length(which(Z[Z>l] > 3*l)) / length(Z[Z>l])
+
+if(P == check){
+  print(P)
+}
+```
+
+Thus, $P(Z > \lambda \ | \  Z > \lambda/2) \approx 0$. Given the choices of $n$ and $\lambda$, it appears there were no samples that satisfied this conditional probability. Using R we can compute the theoretical value of this probability, which confirms that it is very close to 0:
+
+```{r}
+pexp(3*l, rate=l, lower.tail=FALSE) / pexp(l, rate=l, lower.tail=FALSE)
+```
+
+Following in the same footsteps as in parts 1C and 1D, we can show adherence of the memoryless property for this probability by proving that:
+
+$$
+\begin{equation}
+\frac{P(Z > 3\lambda)}{P(Z > \lambda)} = P(Z > 2\lambda)
+\end{equation}
+$$
+To determine $P(Z > 3\lambda)$ we can solve the following integral:
+
+$$
+\begin{align}
+P(Z > \lambda) &= 1 - \int_0^{3\lambda} \lambda e^{-\lambda x} \ dx \\
+&= 1 - (-e^{-\lambda x}|_0^{3\lambda}) \\
+&= 1 - (-e^{-3\lambda^2}-1) \\
+&= e^{-3\lambda^2}
+\end{align}
+$$
+
+We have already determined $P(Z > \lambda)$ in part 1C, and so can immediately compute $\frac{P(Z > 3\lambda)}{P(Z > \lambda)}$:
+
+$$
+\begin{align}
+\frac{P(Z > 3\lambda)}{P(Z > \lambda)} = \frac{e^{-3\lambda^2}} {e^{-\lambda^2}}=e^{-3\lambda^2+\lambda^2} = e^{-2\lambda^2} = P(Z > 2\lambda)
+\end{align}
+$$
+
+Thus, we have confirmed the exponential distribution's memoryless trait for this conditional probability. 
+
+# Part F 
+
+## Description
+
+Loosely investigate whether $P(YZ) = P(Y)P(Z)$ by building a table with quartiles and evaluating the marginal and joint probabilities.
+
+## Solution
+
+
+
+```{r}
+Y <- rexp(samples, rate=l)
+Z <- Y + rexp(samples, rate=l)
+
+Y_quants <- quantile(Y, probs=c(0.25, 0.5, 0.75, 1))
+Z_quants <- quantile(Z, probs=c(0.25, 0.5, 0.75, 1))
+YZ_quants <- t(tcrossprod(Y_quants, Z_quants))
+row_sum <- apply(YZ_quants, 1, sum)
+col_sum <- sum(apply(YZ_quants, 2, sum))
+YZ_quants / col_sum
+```
+
+```{r}
+a <- runif(10000)
+b <- a + runif(10000)
+
+Y_quants <- quantile(a, probs=c(0.25, 0.5, 0.75, 1))
+Z_quants <- quantile(b, probs=c(0.25, 0.5, 0.75, 1))
+YZ_quants <- t(tcrossprod(Y_quants, Z_quants))
+row_sum <- apply(YZ_quants, 1, sum)
+col_sum <- sum(apply(YZ_quants, 2, sum))
+
+YZ_quants / col_sum
+
+```
+
+
+```{r}
+set.seed(2023)
+Y <- sample(1:6, 10000, replace=TRUE)
+Z <- Y + sample(1:6, 10000, replace=TRUE)
+freqs <- unname(table(Y, Z))
+row_sums <- apply(freqs, 1, sum)
+
+```
+
+
+```{r}
+library(stats)
+
+fisher.test(freqs, simulate.p.value = TRUE)
+```
+
+# Part G
+
+## Description 
+
+Check to see if independence holds by using Fisher’s Exact Test and the Chi Square Test.  What is the difference between the two? Which is most appropriate?
+
+## Solution
+
+
+
+

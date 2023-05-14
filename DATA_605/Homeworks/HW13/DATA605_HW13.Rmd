@@ -36,30 +36,31 @@ Substituting back in for $x$ gives the final solution: $\int 4e^{-7x} \ dx = -\f
 
 ## Description 
 
-Biologists are treating a pond contaminated with bacteria. The level of contamination is changing at a rate of \frac{dN}{dt} = -\frac{3,150}{t^4}-220 bacteria per cubic centimeter per day, where $t$ is the number of days since treatment began. Find a function $N(t)$ to estimate the level of contamination if the level after 1 day was 6,530 bacteria per cubic centimeter. 
+Biologists are treating a pond contaminated with bacteria. The level of contamination is changing at a rate of $\frac{dN}{dt} = -\frac{3,150}{t^4}-220$ bacteria per cubic centimeter per day, where $t$ is the number of days since treatment began. Find a function $N(t)$ to estimate the level of contamination if the level after 1 day was 6,530 bacteria per cubic centimeter. 
 
 ## Solution 
+
 Via the fundamental theorem of calculus we know that: $\int \frac{dN}{dt} \ dt = N(t)$. This integration is performed below:
 
 $$
 \begin{align}
 \int \frac{dN}{dt} &= \int -\frac{3,150}{t^4}-220 \ dt  \\
-&= \frac{-1,050}{t^3} -220t + C \\
+&= \frac{1,050}{t^3} -220t + C \\
 \end{align}
 $$
 
-Thus, $N(t) = \frac{-1050}{t^3} -220t + C$. To solve for $C$, we use the fact that $N(1) = 6,530$ and plug into our equation:
+Thus, $N(t) = \frac{1050}{t^3} -220t + C$. To solve for $C$, we use the fact that $N(1) = 6,530$ and plug into our equation:
 
 
 $$
 \begin{align}
-N(1) &= \frac{-1,050}{(1)^3} -220(1) + C \\
-6,530 &= -1,050 - 220 + C \\
-C &= 7,800
+N(1) &= \frac{1,050}{(1)^3} -220(1) + C \\
+6,530 &= 1,050 - 220 + C \\
+C &= 5,700
 \end{align}
 $$
 
-Thus, in conclusion we have that: $N(t) = \frac{-1050}{t^3} -220t + 7,800$.
+Thus, in conclusion we have that: $N(t) = \frac{1050}{t^3} -220t + 5,700$.
 
 # Question 3
 
@@ -149,7 +150,7 @@ $$
 C = 3.75 \cdot \frac{y}{2} + 8.25x
 $$
 
-Since the total number of irons expected to be sold is 110, we also know that $xy$ = 100. Thus, $y = \frac{110}{x} and we can rewrite the above equation as: 
+Since the total number of irons expected to be sold is 110, we also know that $xy$ = 100. Thus, $y = \frac{110}{x}$ and we can rewrite the above equation as: 
 
 $$
 C = \frac{206.25}{x} + 8.25x
