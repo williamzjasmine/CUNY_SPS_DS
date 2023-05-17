@@ -1546,9 +1546,9 @@ for constant failure rates, service times, etc.</p>
 <hr />
 <p>The three distributions, <span class="math inline">\(X, Y\)</span>,
 and <span class="math inline">\(Z\)</span>, are created below
-empirically using parameters <span class="math inline">\(n\)</span>=10
+empirically using parameters <span class="math inline">\(n=10\)</span>
 and <span class="math inline">\(\lambda=5\)</span>:</p>
-<pre class="r"><code>set.seed(2023)
+<pre class="r"><code>set.seed(seed_num)
 
 samples &lt;- 10000
 n &lt;- 6
@@ -1576,11 +1576,13 @@ deviations of the three probability distributions:</p>
 means &lt;- apply(pdfs, 2, mean)
 vars &lt;- apply(pdfs, 2, var)
 
-cbind(means, vars)</code></pre>
+mean_var &lt;- cbind(means, vars)
+rownames(mean_var) &lt;- c(&#39;X&#39;, &#39;Y&#39;, &#39;Z&#39;)
+mean_var</code></pre>
 <pre><code>##       means      vars
-## X 2.9921574 1.5263327
-## Y 2.9613493 1.4913688
-## Z 0.4978819 0.2444714</code></pre>
+## X 2.9977346 1.5339061
+## Y 2.9790812 1.4789938
+## Z 0.5044382 0.2523357</code></pre>
 </div>
 </div>
 <div id="part-b" class="section level1">
@@ -1607,12 +1609,12 @@ g_X(x, n, \lambda) =
 \]</span></p>
 <p>where <span class="math inline">\(n\)</span> and <span class="math inline">\(\lambda\)</span> are the parameters described
 above, and <span class="math inline">\(\Gamma(n) = (n-1)!\)</span> is
-the Gamma function. The expectation value <span class="math inline">\(E(X)\)</span> of a probability distribution
-function <span class="math inline">\(f(x)\)</span> is defined as <span class="math inline">\(E(x) = \int x \cdot f(x) \ dx\)</span>. Thus, to
+the Gamma function. The expectation value <span class="math inline">\(E[X]\)</span> of a probability distribution
+function <span class="math inline">\(f(x)\)</span> is defined as <span class="math inline">\(E[X] = \int x \cdot f(x) \ dx\)</span>. Thus, to
 determine the expectation value of <span class="math inline">\(g_X\)</span>, we can solve the following:</p>
 <p><span class="math display">\[
 \begin{equation}
-E(X) = \int_0^{\infty} \frac{\lambda^n}{\Gamma(n)}x^{n-1}e^{-\lambda x}
+E[X] = \int_0^{\infty} \frac{\lambda^n}{\Gamma(n)}x^{n-1}e^{-\lambda x}
 \cdot x \ dx
 \end{equation}
 \]</span></p>
@@ -1621,7 +1623,7 @@ can use some algebraic manipulation to make it much simpler. The first
 step involves pulling a out a <span class="math inline">\(\frac{1}{\lambda}\)</span>:</p>
 <p><span class="math display">\[
 \begin{equation}
-E(X) = \int_0^{\infty}
+E[X] = \int_0^{\infty}
 \frac{1}{\lambda}\frac{\lambda^{n+1}}{\Gamma(n)}x^{n-1}e^{-\lambda x}
 \cdot x \ dx
 \end{equation}
@@ -1630,7 +1632,7 @@ E(X) = \int_0^{\infty}
 \frac{\Gamma(n+1)}{n}\)</span> to pull out a <span class="math inline">\(n\)</span>:</p>
 <p><span class="math display">\[
 \begin{equation}
-E(X) = \int_0^{\infty}
+E[X] = \int_0^{\infty}
 \frac{n}{\lambda}\frac{\lambda^{n+1}}{\Gamma(n+1)}x^{n-1}e^{-\lambda x}
 \cdot x \ dx
 \end{equation}
@@ -1639,7 +1641,7 @@ E(X) = \int_0^{\infty}
 and pull out the constant <span class="math inline">\(\frac{n}{\lambda}\)</span>:</p>
 <p><span class="math display">\[
 \begin{equation}
-E(X) = \frac{n}{\lambda} \int_0^{\infty}
+E[X] = \frac{n}{\lambda} \int_0^{\infty}
 \frac{\lambda^{n+1}}{\Gamma(n+1)}x^{(n+1)-1}e^{-\lambda x} \ dx
 \end{equation}
 \]</span></p>
@@ -1649,7 +1651,7 @@ probability distribution function with parameters <span class="math inline">\(n+
 entire integrand as follows:</p>
 <p><span class="math display">\[
 \begin{equation}
-E(X) =\frac{n}{\lambda} \int_0^{\infty} g_X(x, n+1, \lambda) \ dx
+E[X] =\frac{n}{\lambda} \int_0^{\infty} g_X(x, n+1, \lambda) \ dx
 \end{equation}
 \]</span></p>
 <p>Since the integral of any probability distribution over its range of
@@ -1657,54 +1659,57 @@ values is equal to 1, we can conclude for the Gamma probability
 distribution that:</p>
 <p><span class="math display">\[
 \begin{equation}
-E(X) = \frac{n}{\lambda}
+E[X] = \frac{n}{\lambda}
 \end{equation}
 \]</span></p>
-<p>Next, we can find the variance of the Gamma probability distribution
-using the fact that <span class="math inline">\(\sigma^2 = E(X^2) -
-E(X)^2\)</span>. However, we must first find <span class="math inline">\(E(X^2)\)</span>, which, given a probability
+<p>Next, we can find the variance <span class="math inline">\(\sigma^2\)</span> of the Gamma probability
+distribution using the fact that <span class="math inline">\(\sigma^2 =
+E[X^2] - E[X]^2\)</span>. However, we must first find <span class="math inline">\(E[X^2]\)</span>, which, given a probability
 density function <span class="math inline">\(f(x)\)</span> is defined
-as: <span class="math inline">\(E(X^2) = \int f(x) \cdot
+as: <span class="math inline">\(E[X^2] = \int f(x) \cdot
 x^2\)</span>:</p>
 <p><span class="math display">\[
 \begin{equation}
-E(X^2) = \int_0^{\infty} \frac{\lambda^n}{\Gamma(n)}x^{n-1}e^{-\lambda
+E[X^2] = \int_0^{\infty} \frac{\lambda^n}{\Gamma(n)}x^{n-1}e^{-\lambda
 x} \cdot x^2 \ dx
 \end{equation}
-\]</span> The steps of solving this integral are quite similar to the
-ones shown above, and are shown below:</p>
+\]</span></p>
+<p>The steps of solving this integral are quite similar to the ones
+shown above:</p>
 <p><span class="math display">\[
 \begin{align}
-E(X) &amp;= \int_0^{\infty}
+E[X] &amp;= \int_0^{\infty}
 \frac{1}{\lambda^2}\frac{\lambda^{n-2}}{\Gamma(n)}x^{n-1}e^{-\lambda x}
 \cdot x^2 \ dx \\
-E(X) &amp;= \int_0^{\infty}
+E[X] &amp;= \int_0^{\infty}
 \frac{1}{\lambda^2}\frac{\lambda^{n-2}}{\Gamma(n)}x^{n-1}e^{-\lambda x}
 \cdot x^2 \ dx \\
-E(X) &amp;= \int_0^{\infty}
+E[X] &amp;= \int_0^{\infty}
 \frac{n(n+1)}{\lambda^2}\frac{\lambda^{n-2}}{\Gamma(n+2)}x^{n-1}e^{-\lambda
 x} \cdot x^2 \ dx \\
-E(X) &amp;= \frac{n(n+1)}{\lambda^2}\int_0^{\infty}
+E[X] &amp;= \frac{n(n+1)}{\lambda^2}\int_0^{\infty}
 \frac{\lambda^{n-2}}{\Gamma(n+2)}x^{(n+2)-1}e^{-\lambda x} \ dx \\
-E(X) &amp;= \frac{n(n+1)}{\lambda^2}\int_0^{\infty} g_X(x, n+2, \lambda)
+E[X] &amp;= \frac{n(n+1)}{\lambda^2}\int_0^{\infty} g_X(x, n+2, \lambda)
 \ dx \\
-E(X) &amp;= \frac{n(n+1)}{\lambda^2}
+E[X] &amp;= \frac{n(n+1)}{\lambda^2}
 \end{align}
-\]</span></p>
-<p>Thus, we can finally compute the variance <span class="math inline">\(\sigma^2\)</span> as follows:</p>
+\]</span> We can now compute the variance <span class="math inline">\(\sigma^2\)</span> as follows:</p>
 <p><span class="math display">\[
 \begin{align}
-\sigma^2 &amp;= E(X^2) - E(X)^2 \\
+\sigma^2 &amp;= E[X^2] - E[X]^2 \\
 \sigma^2 &amp;= \frac{n^2+n}{\lambda^2} - \frac{n^2}{\lambda^2} \\
 \sigma^2 &amp;= \frac{n}{\lambda^2}
 \end{align}
 \]</span></p>
-<p>Using the values of <span class="math inline">\(n\)</span> and <span class="math inline">\(\lambda\)</span> chosen in part 1A, we get that
-<span class="math inline">\(E(X) = \frac{n}{\lambda} = 10/5 = 2\)</span>
+<p>Using the values of <span class="math inline">\(n\)</span> and <span class="math inline">\(\lambda\)</span> chosen in part A, we get that
+<span class="math inline">\(E[X] = \frac{n}{\lambda} = 6/2 = 3\)</span>
 and <span class="math inline">\(\sigma^2 = \frac{n}{\lambda^2} =
-\frac{10}{25}=0.4\)</span>. These are very close to the empirically
+\frac{6}{4}=1.5\)</span>. These are very close to the empirically
 calculated values for the <span class="math inline">\(X\)</span>
-probability distribution in part 1A.</p>
+probability distribution in part A.</p>
+<pre class="r"><code>print(mean_var[1,])</code></pre>
+<pre><code>##    means     vars 
+## 2.997735 1.533906</code></pre>
 <hr />
 <p>The exponential probability distribution is defined as follows:</p>
 <p><span class="math display">\[
@@ -1733,7 +1738,7 @@ M&#39;_X(t) &amp;= \frac{d}{dt}\left( \frac{\lambda}{\lambda - t}
 M&#39;_X(t) &amp;= \frac{\lambda}{(\lambda-t)^2} \\
 \end{align}
 \]</span></p>
-<p>We can now plug 0 into the above to find <span class="math inline">\(E(X)\)</span>:</p>
+<p>We can now plug 0 into the above to find <span class="math inline">\(E[X]\)</span>:</p>
 <p><span class="math display">\[
 \begin{align}
 E[X] &amp;= M&#39;_X(0) \\
@@ -1742,17 +1747,17 @@ E[X] &amp;= \frac{\lambda}{\lambda^2} \\
 E[X] &amp;= \frac{1}{\lambda} \\
 \end{align}
 \]</span></p>
-<p>We see indeed that the that mean of the <span class="math inline">\(Z\)</span> distribution from part 1A is very close
-to <span class="math inline">\(\frac{1}{\lambda} = \frac{1}{5} =
-0.2\)</span>.</p>
-<p>The distribution <span class="math inline">\(Y\)</span> from part 1A
-is just a sum of <span class="math inline">\(n\)</span> exponential
-random variables: <span class="math inline">\(Y = \sum_1^n Z\)</span>.
-Because the expected value of the sum of several random variables is
-equal to the sum of their expectations (i.e. <span class="math inline">\(E[U+W] = E[W] + E[U]\)</span>), the expected value
-of <span class="math inline">\(Y\)</span> (a distribution that
-represents the sum of <span class="math inline">\(n\)</span> exponential
-random variables) can be written as:</p>
+<p>We see indeed that the that mean of the <span class="math inline">\(Z\)</span> distribution from A is very close to
+<span class="math inline">\(\frac{1}{\lambda} = \frac{1}{2} =
+0.5\)</span>:</p>
+<pre class="r"><code>print(mean_var[3,1])</code></pre>
+<pre><code>## [1] 0.5044382</code></pre>
+<p>The distribution <span class="math inline">\(Y\)</span> from part A
+is a sum of <span class="math inline">\(n\)</span> exponential random
+variables: <span class="math inline">\(Y = \sum_1^n Z\)</span>. Because
+the expected value of the sum of several random variables is equal to
+the sum of their expectations (i.e. <span class="math inline">\(E[U+W] =
+E[W] + E[U]\)</span>), the expected value of <span class="math inline">\(Y\)</span> can be written as:</p>
 <p><span class="math display">\[
 \begin{align}
 E[Y] &amp;= \sum_1^n E[Z] \\
@@ -1763,9 +1768,12 @@ E[Y] &amp;= \frac{n}{\lambda}
 <p>Note that this is exactly the same expression that represents the
 expected value of a Gamma probability distribution. Thus, a Gamma
 probability distribution with size parameter <span class="math inline">\(n\)</span> has exactly the same expected value as
-a probability distribution that represents the sum of <span class="math inline">\(n\)</span> exponential random variables. Looking
-at the mean of <span class="math inline">\(Y\)</span> from part 1A, we
-see that is indeed very close to <span class="math inline">\(\frac{n}{\lambda} = \frac{10}{5}=2\)</span>.</p>
+a probability distribution that represents the sum of <span class="math inline">\(n\)</span> exponential random variables, so long
+as all the variables have the same rate parameter <span class="math inline">\(\lambda\)</span>. Looking at the mean of <span class="math inline">\(Y\)</span> from part A, we see that is indeed very
+close to <span class="math inline">\(\frac{n}{\lambda} =
+\frac{6}{2}=3\)</span>:</p>
+<pre class="r"><code>print(mean_var[2,1])</code></pre>
+<pre><code>## [1] 2.979081</code></pre>
 </div>
 </div>
 <div id="part-c" class="section level1">
@@ -1784,8 +1792,9 @@ calculus whether the memoryless property holds.</p>
 P(A|B) = \frac{P(B|A) \cdot P(A)}{P(B)}
 \]</span></p>
 <p>In this case, <span class="math inline">\(P(B|A) = P(Z &gt; \lambda/2
-\ |\  Z &gt; \lambda) = 1\)</span>, since if <span class="math inline">\(Z\)</span> is greater than <span class="math inline">\(\lambda\)</span> it must be greater than <span class="math inline">\(\lambda / 2\)</span>. Thus, we can easily compute
-<span class="math inline">\(P\)</span> in the cell below:</p>
+\ |\  Z &gt; \lambda) = 1\)</span>, since if <span class="math inline">\(Z\)</span> is greater than <span class="math inline">\(\lambda\)</span> it must also be greater than
+<span class="math inline">\(\lambda / 2\)</span>. Thus, we can easily
+compute <span class="math inline">\(P\)</span> by dividing <span class="math inline">\(P(A)\)</span> by <span class="math inline">\(P(B)\)</span>. This is done in the cell below:</p>
 <pre class="r"><code>P_A &lt;- length(which(Z &gt; l)) / samples
 P_B &lt;- length(which(Z &gt; l/2)) / samples
 P &lt;- P_A / P_B
@@ -1796,7 +1805,7 @@ check &lt;- length(which(Z[Z&gt;l/2] &gt; l)) / length(Z[Z&gt;l/2])
 if(P == check){
   print(P)
 }</code></pre>
-<pre><code>## [1] 0.1330377</code></pre>
+<pre><code>## [1] 0.1341552</code></pre>
 <p>Thus, <span class="math inline">\(P(Z &gt; \lambda \ | \  Z &gt;
 \lambda/2) \approx 0.133\)</span>.</p>
 <p>Given a continuous random variable <span class="math inline">\(X\)</span>, its associated probability
@@ -1809,8 +1818,9 @@ other words, we must prove that:</p>
 \begin{equation}
 \frac{P(Z &gt; \lambda)}{P(Z &gt; \lambda/2)} = P(Z &gt; \lambda/2)
 \end{equation}
-\]</span> To determine <span class="math inline">\(P(Z &gt;
-\lambda)\)</span> we can solve the following integral:</p>
+\]</span></p>
+<p>To determine <span class="math inline">\(P(Z &gt; \lambda)\)</span>
+we can solve the following integral:</p>
 <p><span class="math display">\[
 \begin{align}
 P(Z &gt; \lambda) &amp;= 1 - \int_0^{\lambda} \lambda e^{-\lambda x} \
@@ -1855,11 +1865,12 @@ calculus whether the memoryless property holds.</p>
 <div id="solution-3" class="section level2">
 <h2>Solution</h2>
 <p>We can determine the probability by mimicking the steps used in part
-1C. Once again we can use Baye’s rule with the helpful addition that
+C. Once again, we can use Baye’s rule with the helpful addition that
 <span class="math inline">\(P(B|A) = P(Z &gt; \lambda \ |\  Z &gt;
 2\lambda) = 1\)</span>, since if <span class="math inline">\(Z\)</span>
-is greater than <span class="math inline">\(2\lambda\)</span> it must be
-greater than <span class="math inline">\(\lambda\)</span>. <span class="math inline">\(P\)</span> is computed in the cell below:</p>
+is greater than <span class="math inline">\(2\lambda\)</span> it must
+also be greater than <span class="math inline">\(\lambda\)</span>. The
+probability is computed in the cell below:</p>
 <pre class="r"><code>P_A &lt;- length(which(Z &gt; 2*l)) / samples
 P_B &lt;- length(which(Z &gt; l)) / samples
 P &lt;- P_A / P_B
@@ -1870,17 +1881,18 @@ check &lt;- length(which(Z[Z&gt;l] &gt; 2*l)) / length(Z[Z&gt;l])
 if(P == check){
   print(P)
 }</code></pre>
-<pre><code>## [1] 0.01666667</code></pre>
-<p>Thus, <span class="math inline">\(P(Z &gt; \lambda \ | \  Z &gt;
-\lambda/2) \approx 0.167\)</span>.</p>
-<p>Following in the same footsteps as in part 1C, we can show adherence
+<pre><code>## [1] 0.02162162</code></pre>
+<p>Thus, <span class="math inline">\(P(Z &gt; 2\lambda \ | \  Z &gt;
+\lambda) \approx 0.022\)</span>.</p>
+<p>Following in the same footsteps as in part C, we can show adherence
 of the memoryless property for this probability by proving that:</p>
 <p><span class="math display">\[
 \begin{equation}
 \frac{P(Z &gt; 2\lambda)}{P(Z &gt; \lambda)} = P(Z &gt; \lambda)
 \end{equation}
-\]</span> To determine <span class="math inline">\(P(Z &gt;
-2\lambda)\)</span> we can solve the following integral:</p>
+\]</span></p>
+<p>To determine <span class="math inline">\(P(Z &gt; 2\lambda)\)</span>
+we can solve the following integral:</p>
 <p><span class="math display">\[
 \begin{align}
 P(Z &gt; \lambda) &amp;= 1 - \int_0^{2\lambda} \lambda e^{-\lambda x} \
@@ -1891,7 +1903,7 @@ dx \\
 \end{align}
 \]</span></p>
 <p>We have already determined <span class="math inline">\(P(Z &gt;
-\lambda)\)</span> in part 1C, and so can immediately compute <span class="math inline">\(\frac{P(Z &gt; 2\lambda)}{P(Z &gt;
+\lambda)\)</span> in part C, and so can immediately compute <span class="math inline">\(\frac{P(Z &gt; 2\lambda)}{P(Z &gt;
 \lambda)}\)</span>:</p>
 <p><span class="math display">\[
 \begin{align}
@@ -1916,11 +1928,11 @@ calculus whether the memoryless property holds.</p>
 <div id="solution-4" class="section level2">
 <h2>Solution</h2>
 <p>We can determine the probability by mimicking the steps used in parts
-1C and 1D. Once again we can use Baye’s rule with the helpful addition
+C and D. Once again, we can use Baye’s rule with the helpful addition
 that <span class="math inline">\(P(B|A) = P(Z &gt; \lambda \ |\  Z &gt;
 3\lambda) = 1\)</span>, since if <span class="math inline">\(Z\)</span>
-is greater than <span class="math inline">\(3\lambda\)</span> it must be
-greater than <span class="math inline">\(\lambda\)</span>. <span class="math inline">\(P\)</span> is computed in the cell below:</p>
+is greater than <span class="math inline">\(3\lambda\)</span> it must
+also be greater than <span class="math inline">\(\lambda\)</span>:</p>
 <pre class="r"><code>P_A &lt;- length(which(Z &gt; 3*l)) / samples
 P_B &lt;- length(which(Z &gt; l)) / samples
 P &lt;- P_A / P_B
@@ -1932,8 +1944,8 @@ if(P == check){
   print(P)
 }</code></pre>
 <pre><code>## [1] 0</code></pre>
-<p>Thus, <span class="math inline">\(P(Z &gt; \lambda \ | \  Z &gt;
-\lambda/2) \approx 0\)</span>. Given the choices of <span class="math inline">\(n\)</span> and <span class="math inline">\(\lambda\)</span>, it appears there were no samples
+<p>Thus, <span class="math inline">\(P(Z &gt; 3\lambda \ | \  Z &gt;
+\lambda) \approx 0\)</span>. Given the choices of <span class="math inline">\(n\)</span> and <span class="math inline">\(\lambda\)</span>, it appears there were no samples
 that satisfied this conditional probability. Using R we can compute the
 theoretical value of this probability, which confirms that it is very
 close to 0:</p>
@@ -1981,50 +1993,76 @@ marginal and joint probabilities.</p>
 </div>
 <div id="solution-5" class="section level2">
 <h2>Solution</h2>
-<pre class="r"><code>Y &lt;- rexp(samples, rate=l)
-Z &lt;- Y + rexp(samples, rate=l)
-
-Y_quants &lt;- quantile(Y, probs=c(0.25, 0.5, 0.75, 1))
+<p>The cell below goes through the process of creating the joint
+probability table by taking the cross product of the quartile values for
+both <span class="math inline">\(Y\)</span> and <span class="math inline">\(Z\)</span>. We can divide each entry in the table
+by the the sum of all table entries to generate the joint
+probabilities:</p>
+<pre class="r"><code>Y_quants &lt;- quantile(Y, probs=c(0.25, 0.5, 0.75, 1))
 Z_quants &lt;- quantile(Z, probs=c(0.25, 0.5, 0.75, 1))
 YZ_quants &lt;- t(tcrossprod(Y_quants, Z_quants))
-row_sum &lt;- apply(YZ_quants, 1, sum)
-col_sum &lt;- sum(apply(YZ_quants, 2, sum))
-YZ_quants / col_sum</code></pre>
-<pre><code>##             [,1]        [,2]       [,3]       [,4]
-## [1,] 0.001411872 0.003367858 0.00675319 0.04802244
-## [2,] 0.002400301 0.005725641 0.01148099 0.08164218
-## [3,] 0.003893988 0.009288658 0.01862551 0.13244739
-## [4,] 0.016000726 0.038167883 0.07653380 0.54423757</code></pre>
-<pre class="r"><code>a &lt;- runif(10000)
-b &lt;- a + runif(10000)
+count_sum &lt;- sum(YZ_quants)
+joint_table &lt;- YZ_quants / count_sum
+joint_table</code></pre>
+<pre><code>##             [,1]        [,2]        [,3]       [,4]
+## [1,] 0.002813712 0.003807419 0.004970523 0.01198910
+## [2,] 0.007039678 0.009525853 0.012435844 0.02999574
+## [3,] 0.013736705 0.018588042 0.024266382 0.05853147
+## [4,] 0.095732305 0.129541700 0.169114557 0.40791097</code></pre>
+<p>The cell below then adds in the marginal probabilities by adding the
+row and column sums of the joint probabilities:</p>
+<pre class="r"><code>row_sums &lt;- apply(joint_table, 1, sum)
+col_sums &lt;- apply(joint_table, 2, sum)
+joint_marginal_table &lt;- cbind(rbind(joint_table, col_sums), c(row_sums, 1))
+colnames(joint_marginal_table) &lt;- c(&#39;1st Quar. Y&#39;, &#39;2nd Quar. Y&#39;,
+                                    &#39;3rd Quar. Y&#39;, &#39;4th Quar. Y&#39;, &#39;Sum&#39;)
+rownames(joint_marginal_table) &lt;- c(&#39;1st Quar. Z&#39;, &#39;2nd Quar. Z&#39;, 
+                                    &#39;3rd Quar.Z&#39;, &#39;4th Quar. Z&#39;, &#39;Sum&#39;)
+joint_marginal_table</code></pre>
+<pre><code>##             1st Quar. Y 2nd Quar. Y 3rd Quar. Y 4th Quar. Y        Sum
+## 1st Quar. Z 0.002813712 0.003807419 0.004970523  0.01198910 0.02358075
+## 2nd Quar. Z 0.007039678 0.009525853 0.012435844  0.02999574 0.05899712
+## 3rd Quar.Z  0.013736705 0.018588042 0.024266382  0.05853147 0.11512260
+## 4th Quar. Z 0.095732305 0.129541700 0.169114557  0.40791097 0.80229953
+## Sum         0.119322399 0.161463013 0.210787307  0.50842728 1.00000000</code></pre>
+<p>We can now use this joint/marginal probability table to investigate
+whether or not <span class="math inline">\(P(Y, Z) = P(Y)\cdot
+P(Z)\)</span>, by creating a matrix which contains compares the two
+values:</p>
+<pre class="r"><code>check_mat &lt;- matrix(nrow = 0, ncol=5)
 
-Y_quants &lt;- quantile(a, probs=c(0.25, 0.5, 0.75, 1))
-Z_quants &lt;- quantile(b, probs=c(0.25, 0.5, 0.75, 1))
-YZ_quants &lt;- t(tcrossprod(Y_quants, Z_quants))
-row_sum &lt;- apply(YZ_quants, 1, sum)
-col_sum &lt;- sum(apply(YZ_quants, 2, sum))
+for(i in 1:4){
+  for(j in 1:4){
+    PYZ &lt;- joint_table[i, j]
+    PYPZ &lt;- row_sums[i] * col_sums[j]
+    diff &lt;- abs(PYZ - PYPZ)
+    diff_row &lt;- c(i, j, PYZ, PYPZ, diff)
+    check_mat &lt;- rbind(check_mat, diff_row)
+  }
+}
 
-YZ_quants / col_sum</code></pre>
-<pre><code>##            [,1]       [,2]       [,3]       [,4]
-## [1,] 0.01403732 0.02814724 0.04236624 0.05663037
-## [2,] 0.01997551 0.04005432 0.06028837 0.08058664
-## [3,] 0.02578479 0.05170293 0.07782144 0.10402285
-## [4,] 0.03963010 0.07946514 0.11960815 0.15987858</code></pre>
-<pre class="r"><code>set.seed(2023)
-Y &lt;- sample(1:6, 10000, replace=TRUE)
-Z &lt;- Y + sample(1:6, 10000, replace=TRUE)
-freqs &lt;- unname(table(Y, Z))
-row_sums &lt;- apply(freqs, 1, sum)</code></pre>
-<pre class="r"><code>library(stats)
-
-fisher.test(freqs, simulate.p.value = TRUE)</code></pre>
-<pre><code>## 
-##  Fisher&#39;s Exact Test for Count Data with simulated p-value (based on
-##  2000 replicates)
-## 
-## data:  freqs
-## p-value = 0.0004998
-## alternative hypothesis: two.sided</code></pre>
+check_mat &lt;- unname(check_mat)
+colnames(check_mat) &lt;- c(&#39;Y Quar&#39;, &#39;Z Quar&#39;, &#39;P(Y,Z)&#39;, &#39;P(Y)P(Z)&#39;, &#39;Diff&#39;)
+check_mat</code></pre>
+<pre><code>##       Y Quar Z Quar      P(Y,Z)    P(Y)P(Z)         Diff
+##  [1,]      1      1 0.002813712 0.002813712 4.336809e-19
+##  [2,]      1      2 0.003807419 0.003807419 0.000000e+00
+##  [3,]      1      3 0.004970523 0.004970523 0.000000e+00
+##  [4,]      1      4 0.011989098 0.011989098 1.734723e-18
+##  [5,]      2      1 0.007039678 0.007039678 8.673617e-19
+##  [6,]      2      2 0.009525853 0.009525853 0.000000e+00
+##  [7,]      2      3 0.012435844 0.012435844 1.734723e-18
+##  [8,]      2      4 0.029995745 0.029995745 3.469447e-18
+##  [9,]      3      1 0.013736705 0.013736705 0.000000e+00
+## [10,]      3      2 0.018588042 0.018588042 3.469447e-18
+## [11,]      3      3 0.024266382 0.024266382 0.000000e+00
+## [12,]      3      4 0.058531470 0.058531470 6.938894e-18
+## [13,]      4      1 0.095732305 0.095732305 0.000000e+00
+## [14,]      4      2 0.129541700 0.129541700 0.000000e+00
+## [15,]      4      3 0.169114557 0.169114557 0.000000e+00
+## [16,]      4      4 0.407910969 0.407910969 0.000000e+00</code></pre>
+<p>As we can see from the above, it is clear that <span class="math inline">\(P(Y, Z) = P(Y)P(Z)\)</span> for every joint
+probability. Thus, we say with a high degree of confidence that <span class="math inline">\(Y\)</span> and <span class="math inline">\(Z\)</span> are independent events.</p>
 </div>
 </div>
 <div id="part-g" class="section level1">
@@ -2037,6 +2075,51 @@ most appropriate?</p>
 </div>
 <div id="solution-6" class="section level2">
 <h2>Solution</h2>
+<p>We can also use statistical tests to confirm the independence of
+<span class="math inline">\(Y\)</span> and <span class="math inline">\(Z\)</span>. First, we can turn our joint
+probability table into a frequency table by multiplying by a large
+enough constant (10,000 in this case), and rounding to the nearest
+integer:</p>
+<pre class="r"><code>freq_table &lt;- round(joint_table * 10000)
+freq_table</code></pre>
+<pre><code>##      [,1] [,2] [,3] [,4]
+## [1,]   28   38   50  120
+## [2,]   70   95  124  300
+## [3,]  137  186  243  585
+## [4,]  957 1295 1691 4079</code></pre>
+<p>The cell below runs a Fisher’s exact test to test for independence
+between <span class="math inline">\(Y\)</span> and <span class="math inline">\(Z\)</span>. Given two variables <span class="math inline">\(Y\)</span> and <span class="math inline">\(Z\)</span>, the null and alternative hypotheses
+for a Fisher’s exact test are as follows:</p>
+<ul>
+<li><span class="math inline">\(H_0\)</span>: <span class="math inline">\(Y\)</span> and <span class="math inline">\(Z\)</span> are independent events.</li>
+<li><span class="math inline">\(H_A\)</span>: <span class="math inline">\(Y\)</span> and <span class="math inline">\(Z\)</span> are dependent events.</li>
+</ul>
+<pre class="r"><code>fisher.test(freq_table, simulate.p.value = TRUE)</code></pre>
+<pre><code>## 
+##  Fisher&#39;s Exact Test for Count Data with simulated p-value (based on
+##  2000 replicates)
+## 
+## data:  freq_table
+## p-value = 1
+## alternative hypothesis: two.sided</code></pre>
+<p>Thus, given the extremely high <span class="math inline">\(p\)</span>
+value, we can reject the alternative hypotheses and confirm that <span class="math inline">\(Y\)</span> and <span class="math inline">\(Z\)</span> are independent.</p>
+<p>We can also perform a Chi-Squared test of association (<span class="math inline">\(H_0\)</span> and <span class="math inline">\(H_A\)</span> are the same as they were for
+Fisher’s exact test):</p>
+<pre class="r"><code>chisq.test(freq_table)</code></pre>
+<pre><code>## 
+##  Pearson&#39;s Chi-squared test
+## 
+## data:  freq_table
+## X-squared = 0.0055442, df = 9, p-value = 1</code></pre>
+<p>Once again, we see a <span class="math inline">\(p\)</span>-value of
+1, indicating that we cannot reject the null hypothesis and conclude
+that <span class="math inline">\(Y\)</span> and <span class="math inline">\(Z\)</span> are independent.</p>
+<p>In this case, though both tests yielded the same results, the
+Chi-Squared test is more appropriate given the sample size. Typically,
+most researchers adhere to following: “if ≤ 20% of expected cell counts
+are less than 5, then use the chi-square test; if &gt; 20% of expected
+cell counts are less than 5, then use Fisher’s exact test.” <a href="https://www.ccjm.org/content/84/9_suppl_2/e20#:~:text=For%20simplicity%2C%20most%20researchers%20adhere,then%20use%20Fisher&#39;s%20exact%20test">(Source)</a></p>
 </div>
 </div>
 

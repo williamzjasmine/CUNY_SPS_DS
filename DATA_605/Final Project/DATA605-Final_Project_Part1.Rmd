@@ -11,6 +11,11 @@ output:
   pdf_document: default
 ---
 
+```{r, echo=FALSE}
+library(stats)
+seed_num = 42
+```
+
 # Introduction/Set Up
 **Probability Density 1:  $X$~$\Gamma$**  
 
@@ -28,10 +33,10 @@ NOTE: The Gamma distribution is quite common in data science.  For example, it i
 
 ---
 
-The three distributions, $X, Y$, and $Z$, are created below empirically using parameters $n$=10 and $\lambda=5$:
+The three distributions, $X, Y$, and $Z$, are created below empirically using parameters $n=10$ and $\lambda=5$:
 
 ```{r}
-set.seed(2023)
+set.seed(seed_num)
 
 samples <- 10000
 n <- 6
@@ -58,7 +63,9 @@ pdfs <- cbind(X, Y, Z)
 means <- apply(pdfs, 2, mean)
 vars <- apply(pdfs, 2, var)
 
-cbind(means, vars)
+mean_var <- cbind(means, vars)
+rownames(mean_var) <- c('X', 'Y', 'Z')
+mean_var
 ```
 
 # Part B 
@@ -82,11 +89,11 @@ g_X(x, n, \lambda) =
 \end{equation}
 $$
 
-where $n$ and $\lambda$ are the parameters described above, and $\Gamma(n) = (n-1)!$ is the Gamma function. The expectation value $E(X)$ of a probability distribution function $f(x)$ is defined as $E(x) = \int x \cdot f(x) \ dx$. Thus, to determine the expectation value of $g_X$, we can solve the following:
+where $n$ and $\lambda$ are the parameters described above, and $\Gamma(n) = (n-1)!$ is the Gamma function. The expectation value $E[X]$ of a probability distribution function $f(x)$ is defined as $E[X] = \int x \cdot f(x) \ dx$. Thus, to determine the expectation value of $g_X$, we can solve the following:
 
 $$
 \begin{equation}
-E(X) = \int_0^{\infty} \frac{\lambda^n}{\Gamma(n)}x^{n-1}e^{-\lambda x} \cdot x \ dx
+E[X] = \int_0^{\infty} \frac{\lambda^n}{\Gamma(n)}x^{n-1}e^{-\lambda x} \cdot x \ dx
 \end{equation}
 $$
 
@@ -94,7 +101,7 @@ Because this is a difficult to solve integral using brute force, we can use some
 
 $$
 \begin{equation}
-E(X) = \int_0^{\infty} \frac{1}{\lambda}\frac{\lambda^{n+1}}{\Gamma(n)}x^{n-1}e^{-\lambda x} \cdot x \ dx
+E[X] = \int_0^{\infty} \frac{1}{\lambda}\frac{\lambda^{n+1}}{\Gamma(n)}x^{n-1}e^{-\lambda x} \cdot x \ dx
 \end{equation}
 $$
 
@@ -102,7 +109,7 @@ Next, we use that fact that $\Gamma(n) = \frac{\Gamma(n+1)}{n}$ to pull out a $n
 
 $$
 \begin{equation}
-E(X) = \int_0^{\infty} \frac{n}{\lambda}\frac{\lambda^{n+1}}{\Gamma(n+1)}x^{n-1}e^{-\lambda x} \cdot x \ dx
+E[X] = \int_0^{\infty} \frac{n}{\lambda}\frac{\lambda^{n+1}}{\Gamma(n+1)}x^{n-1}e^{-\lambda x} \cdot x \ dx
 \end{equation}
 $$
 
@@ -110,7 +117,7 @@ Next, we combine the $x$ terms, and pull out the constant $\frac{n}{\lambda}$:
 
 $$
 \begin{equation}
-E(X) = \frac{n}{\lambda} \int_0^{\infty} \frac{\lambda^{n+1}}{\Gamma(n+1)}x^{(n+1)-1}e^{-\lambda x} \ dx
+E[X] = \frac{n}{\lambda} \int_0^{\infty} \frac{\lambda^{n+1}}{\Gamma(n+1)}x^{(n+1)-1}e^{-\lambda x} \ dx
 \end{equation}
 $$
 
@@ -118,7 +125,7 @@ While this method of combining exponents in the $x$ term might seem strange, the
 
 $$
 \begin{equation}
-E(X) =\frac{n}{\lambda} \int_0^{\infty} g_X(x, n+1, \lambda) \ dx
+E[X] =\frac{n}{\lambda} \int_0^{\infty} g_X(x, n+1, \lambda) \ dx
 \end{equation}
 $$
 
@@ -126,41 +133,46 @@ Since the integral of any probability distribution over its range of values is e
 
 $$
 \begin{equation}
-E(X) = \frac{n}{\lambda}
+E[X] = \frac{n}{\lambda}
 \end{equation}
 $$
 
-Next, we can find the variance of the Gamma probability distribution using the fact that $\sigma^2 = E(X^2) - E(X)^2$. However, we must first find $E(X^2)$, which, given a probability density function $f(x)$ is defined as: $E(X^2) = \int f(x) \cdot x^2$:
+Next, we can find the variance $\sigma^2$ of the Gamma probability distribution using the fact that $\sigma^2 = E[X^2] - E[X]^2$. However, we must first find $E[X^2]$, which, given a probability density function $f(x)$ is defined as: $E[X^2] = \int f(x) \cdot x^2$:
 
 $$
 \begin{equation}
-E(X^2) = \int_0^{\infty} \frac{\lambda^n}{\Gamma(n)}x^{n-1}e^{-\lambda x} \cdot x^2 \ dx
+E[X^2] = \int_0^{\infty} \frac{\lambda^n}{\Gamma(n)}x^{n-1}e^{-\lambda x} \cdot x^2 \ dx
 \end{equation}
 $$
-The steps of solving this integral are quite similar to the ones shown above, and are shown below:
+
+The steps of solving this integral are quite similar to the ones shown above:
 
 $$
 \begin{align}
-E(X) &= \int_0^{\infty} \frac{1}{\lambda^2}\frac{\lambda^{n-2}}{\Gamma(n)}x^{n-1}e^{-\lambda x} \cdot x^2 \ dx \\
-E(X) &= \int_0^{\infty} \frac{1}{\lambda^2}\frac{\lambda^{n-2}}{\Gamma(n)}x^{n-1}e^{-\lambda x} \cdot x^2 \ dx \\
-E(X) &= \int_0^{\infty} \frac{n(n+1)}{\lambda^2}\frac{\lambda^{n-2}}{\Gamma(n+2)}x^{n-1}e^{-\lambda x} \cdot x^2 \ dx \\
-E(X) &= \frac{n(n+1)}{\lambda^2}\int_0^{\infty} \frac{\lambda^{n-2}}{\Gamma(n+2)}x^{(n+2)-1}e^{-\lambda x} \ dx \\
-E(X) &= \frac{n(n+1)}{\lambda^2}\int_0^{\infty} g_X(x, n+2, \lambda) \ dx \\
-E(X) &= \frac{n(n+1)}{\lambda^2}
+E[X] &= \int_0^{\infty} \frac{1}{\lambda^2}\frac{\lambda^{n-2}}{\Gamma(n)}x^{n-1}e^{-\lambda x} \cdot x^2 \ dx \\
+E[X] &= \int_0^{\infty} \frac{1}{\lambda^2}\frac{\lambda^{n-2}}{\Gamma(n)}x^{n-1}e^{-\lambda x} \cdot x^2 \ dx \\
+E[X] &= \int_0^{\infty} \frac{n(n+1)}{\lambda^2}\frac{\lambda^{n-2}}{\Gamma(n+2)}x^{n-1}e^{-\lambda x} \cdot x^2 \ dx \\
+E[X] &= \frac{n(n+1)}{\lambda^2}\int_0^{\infty} \frac{\lambda^{n-2}}{\Gamma(n+2)}x^{(n+2)-1}e^{-\lambda x} \ dx \\
+E[X] &= \frac{n(n+1)}{\lambda^2}\int_0^{\infty} g_X(x, n+2, \lambda) \ dx \\
+E[X] &= \frac{n(n+1)}{\lambda^2}
 \end{align}
 $$
-
-Thus, we can finally compute the variance $\sigma^2$ as follows:
+We can now compute the variance $\sigma^2$ as follows:
 
 $$
 \begin{align}
-\sigma^2 &= E(X^2) - E(X)^2 \\
+\sigma^2 &= E[X^2] - E[X]^2 \\
 \sigma^2 &= \frac{n^2+n}{\lambda^2} - \frac{n^2}{\lambda^2} \\
 \sigma^2 &= \frac{n}{\lambda^2} 
 \end{align}
 $$
 
-Using the values of $n$ and $\lambda$ chosen in part 1A, we get that $E(X) = \frac{n}{\lambda} = 10/5 = 2$ and $\sigma^2 = \frac{n}{\lambda^2} = \frac{10}{25}=0.4$. These are very close to the empirically calculated values for the $X$ probability distribution in part 1A.
+Using the values of $n$ and $\lambda$ chosen in part A, we get that $E[X] = \frac{n}{\lambda} = 6/2 = 3$ and $\sigma^2 = \frac{n}{\lambda^2} = \frac{6}{4}=1.5$. These are very close to the empirically calculated values for the $X$ probability distribution in part A.
+
+```{r}
+print(mean_var[1,])
+
+```
 
 ---
 
@@ -194,7 +206,7 @@ M'_X(t) &= \frac{\lambda}{(\lambda-t)^2} \\
 \end{align}
 $$
 
-We can now plug 0 into the above to find $E(X)$:
+We can now plug 0 into the above to find $E[X]$:
 
 $$
 \begin{align}
@@ -205,9 +217,13 @@ E[X] &= \frac{1}{\lambda} \\
 \end{align}
 $$
 
-We see indeed that the that mean of the $Z$ distribution from part 1A is very close to $\frac{1}{\lambda} = \frac{1}{5} = 0.2$.
+We see indeed that the that mean of the $Z$ distribution from A is very close to $\frac{1}{\lambda} = \frac{1}{2} = 0.5$:
 
-The distribution $Y$ from part 1A is just a sum of $n$ exponential random variables: $Y = \sum_1^n Z$. Because the expected value of the sum of several random variables is equal to the sum of their expectations (i.e. $E[U+W] = E[W] + E[U]$), the expected value of $Y$ (a distribution that represents the sum of $n$ exponential random variables) can be written as:
+```{r}
+print(mean_var[3,1])
+```
+
+The distribution $Y$ from part A is a sum of $n$ exponential random variables: $Y = \sum_1^n Z$. Because the expected value of the sum of several random variables is equal to the sum of their expectations (i.e. $E[U+W] = E[W] + E[U]$), the expected value of $Y$ can be written as:
 
 $$
 \begin{align}
@@ -217,7 +233,11 @@ E[Y] &= \frac{n}{\lambda}
 \end{align}
 $$
 
-Note that this is exactly the same expression that represents the expected value of a Gamma probability distribution. Thus, a Gamma probability distribution with size parameter $n$ has exactly the same expected value as a probability distribution that represents the sum of $n$ exponential random variables. Looking at the mean of $Y$ from part 1A, we see that is indeed very close to $\frac{n}{\lambda} = \frac{10}{5}=2$.
+Note that this is exactly the same expression that represents the expected value of a Gamma probability distribution. Thus, a Gamma probability distribution with size parameter $n$ has exactly the same expected value as a probability distribution that represents the sum of $n$ exponential random variables, so long as all the variables have the same rate parameter $\lambda$. Looking at the mean of $Y$ from part A, we see that is indeed very close to $\frac{n}{\lambda} = \frac{6}{2}=3$:
+
+```{r}
+print(mean_var[2,1])
+```
 
 # Part C   
 
@@ -233,8 +253,7 @@ $$
 P(A|B) = \frac{P(B|A) \cdot P(A)}{P(B)}
 $$
 
-In this case, $P(B|A) = P(Z > \lambda/2 \ |\  Z > \lambda) = 1$, since if $Z$ is greater than $\lambda$ it must be greater than $\lambda / 2$. Thus, we can easily compute $P$ in the cell below:
-
+In this case, $P(B|A) = P(Z > \lambda/2 \ |\  Z > \lambda) = 1$, since if $Z$ is greater than $\lambda$ it must also be greater than $\lambda / 2$. Thus, we can easily compute $P$ by dividing $P(A)$ by $P(B)$. This is done in the cell below:
 
 ```{r}
 P_A <- length(which(Z > l)) / samples
@@ -258,6 +277,7 @@ $$
 \frac{P(Z > \lambda)}{P(Z > \lambda/2)} = P(Z > \lambda/2)
 \end{equation}
 $$
+
 To determine $P(Z > \lambda)$ we can solve the following integral:
 
 $$
@@ -298,7 +318,7 @@ For PDF $Z$ (the exponential), calculate empirically the probability $P(Z > 2\la
 
 ## Solution
 
-We can determine the probability by mimicking the steps used in part 1C. Once again we can use Baye's rule with the helpful addition that $P(B|A) = P(Z > \lambda \ |\  Z > 2\lambda) = 1$, since if $Z$ is greater than $2\lambda$ it must be greater than $\lambda$. $P$ is computed in the cell below:
+We can determine the probability by mimicking the steps used in part C. Once again, we can use Baye's rule with the helpful addition that $P(B|A) = P(Z > \lambda \ |\  Z > 2\lambda) = 1$, since if $Z$ is greater than $2\lambda$ it must also be greater than $\lambda$. The probability is computed in the cell below:
 
 ```{r}
 P_A <- length(which(Z > 2*l)) / samples
@@ -313,15 +333,16 @@ if(P == check){
 }
 ```
 
-Thus, $P(Z > \lambda \ | \  Z > \lambda/2) \approx 0.167$. 
+Thus, $P(Z > 2\lambda \ | \  Z > \lambda) \approx 0.022$. 
 
-Following in the same footsteps as in part 1C, we can show adherence of the memoryless property for this probability by proving that:
+Following in the same footsteps as in part C, we can show adherence of the memoryless property for this probability by proving that:
 
 $$
 \begin{equation}
 \frac{P(Z > 2\lambda)}{P(Z > \lambda)} = P(Z > \lambda)
 \end{equation}
 $$
+
 To determine $P(Z > 2\lambda)$ we can solve the following integral:
 
 $$
@@ -333,7 +354,7 @@ P(Z > \lambda) &= 1 - \int_0^{2\lambda} \lambda e^{-\lambda x} \ dx \\
 \end{align}
 $$
 
-We have already determined $P(Z > \lambda)$ in part 1C, and so can immediately compute $\frac{P(Z > 2\lambda)}{P(Z > \lambda)}$:
+We have already determined $P(Z > \lambda)$ in part C, and so can immediately compute $\frac{P(Z > 2\lambda)}{P(Z > \lambda)}$:
 
 $$
 \begin{align}
@@ -351,7 +372,7 @@ For PDF $Z$ (the exponential), calculate empirically the probability $P(Z > 3\la
 
 ## Solution
 
-We can determine the probability by mimicking the steps used in parts 1C and 1D. Once again we can use Baye's rule with the helpful addition that $P(B|A) = P(Z > \lambda \ |\  Z > 3\lambda) = 1$, since if $Z$ is greater than $3\lambda$ it must be greater than $\lambda$. $P$ is computed in the cell below:
+We can determine the probability by mimicking the steps used in parts C and D. Once again, we can use Baye's rule with the helpful addition that $P(B|A) = P(Z > \lambda \ |\  Z > 3\lambda) = 1$, since if $Z$ is greater than $3\lambda$ it must also be greater than $\lambda$:
 
 ```{r}
 P_A <- length(which(Z > 3*l)) / samples
@@ -366,7 +387,7 @@ if(P == check){
 }
 ```
 
-Thus, $P(Z > \lambda \ | \  Z > \lambda/2) \approx 0$. Given the choices of $n$ and $\lambda$, it appears there were no samples that satisfied this conditional probability. Using R we can compute the theoretical value of this probability, which confirms that it is very close to 0:
+Thus, $P(Z > 3\lambda \ | \  Z > \lambda) \approx 0$. Given the choices of $n$ and $\lambda$, it appears there were no samples that satisfied this conditional probability. Using R we can compute the theoretical value of this probability, which confirms that it is very close to 0:
 
 ```{r}
 pexp(3*l, rate=l, lower.tail=FALSE) / pexp(l, rate=l, lower.tail=FALSE)
@@ -408,50 +429,51 @@ Loosely investigate whether $P(YZ) = P(Y)P(Z)$ by building a table with quartile
 
 ## Solution
 
-
+The cell below goes through the process of creating the joint probability table by taking the cross product of the quartile values for both $Y$ and $Z$. We can divide each entry in the table by the the sum of all table entries to generate the joint probabilities:
 
 ```{r}
-Y <- rexp(samples, rate=l)
-Z <- Y + rexp(samples, rate=l)
-
 Y_quants <- quantile(Y, probs=c(0.25, 0.5, 0.75, 1))
 Z_quants <- quantile(Z, probs=c(0.25, 0.5, 0.75, 1))
 YZ_quants <- t(tcrossprod(Y_quants, Z_quants))
-row_sum <- apply(YZ_quants, 1, sum)
-col_sum <- sum(apply(YZ_quants, 2, sum))
-YZ_quants / col_sum
+count_sum <- sum(YZ_quants)
+joint_table <- YZ_quants / count_sum
+joint_table
 ```
+
+The cell below then adds in the marginal probabilities by adding the row and column sums of the joint probabilities:
 
 ```{r}
-a <- runif(10000)
-b <- a + runif(10000)
-
-Y_quants <- quantile(a, probs=c(0.25, 0.5, 0.75, 1))
-Z_quants <- quantile(b, probs=c(0.25, 0.5, 0.75, 1))
-YZ_quants <- t(tcrossprod(Y_quants, Z_quants))
-row_sum <- apply(YZ_quants, 1, sum)
-col_sum <- sum(apply(YZ_quants, 2, sum))
-
-YZ_quants / col_sum
-
+row_sums <- apply(joint_table, 1, sum)
+col_sums <- apply(joint_table, 2, sum)
+joint_marginal_table <- cbind(rbind(joint_table, col_sums), c(row_sums, 1))
+colnames(joint_marginal_table) <- c('1st Quar. Y', '2nd Quar. Y',
+                                    '3rd Quar. Y', '4th Quar. Y', 'Sum')
+rownames(joint_marginal_table) <- c('1st Quar. Z', '2nd Quar. Z', 
+                                    '3rd Quar.Z', '4th Quar. Z', 'Sum')
+joint_marginal_table
 ```
 
+We can now use this joint/marginal probability table to investigate whether or not $P(Y, Z) = P(Y)\cdot P(Z)$, by creating a matrix which contains compares the two values:
 
 ```{r}
-set.seed(2023)
-Y <- sample(1:6, 10000, replace=TRUE)
-Z <- Y + sample(1:6, 10000, replace=TRUE)
-freqs <- unname(table(Y, Z))
-row_sums <- apply(freqs, 1, sum)
+check_mat <- matrix(nrow = 0, ncol=5)
 
+for(i in 1:4){
+  for(j in 1:4){
+    PYZ <- joint_table[i, j]
+    PYPZ <- row_sums[i] * col_sums[j]
+    diff <- abs(PYZ - PYPZ)
+    diff_row <- c(i, j, PYZ, PYPZ, diff)
+    check_mat <- rbind(check_mat, diff_row)
+  }
+}
+
+check_mat <- unname(check_mat)
+colnames(check_mat) <- c('Y Quar', 'Z Quar', 'P(Y,Z)', 'P(Y)P(Z)', 'Diff')
+check_mat
 ```
 
-
-```{r}
-library(stats)
-
-fisher.test(freqs, simulate.p.value = TRUE)
-```
+As we can see from the above, it is clear that $P(Y, Z) = P(Y)P(Z)$ for every joint probability. Thus, we say with a high degree of confidence that $Y$ and $Z$ are independent events. 
 
 # Part G
 
@@ -461,6 +483,30 @@ Check to see if independence holds by using Fisher’s Exact Test and the Chi Sq
 
 ## Solution
 
+We can also use statistical tests to confirm the independence of $Y$ and $Z$. First, we can turn our joint probability table into a frequency table by multiplying by a large enough constant (10,000 in this case), and rounding to the nearest integer:
 
+```{r}
+freq_table <- round(joint_table * 10000)
+freq_table
+```
 
+The cell below runs a Fisher's exact test to test for independence between $Y$ and $Z$. Given two variables $Y$ and $Z$, the null and alternative hypotheses for a Fisher's exact test are as follows:
 
+* $H_0$: $Y$ and $Z$ are independent events.
+* $H_A$: $Y$ and $Z$ are dependent events.
+
+```{r}
+fisher.test(freq_table, simulate.p.value = TRUE)
+```
+
+Thus, given the extremely high $p$ value, we can reject the alternative hypotheses and confirm that $Y$ and $Z$ are independent. 
+
+We can also perform a Chi-Squared test of association ($H_0$ and $H_A$ are the same as they were for Fisher's exact test): 
+
+```{r}
+chisq.test(freq_table)
+```
+
+Once again, we see a $p$-value of 1, indicating that we cannot reject the null hypothesis and conclude that $Y$ and $Z$ are independent. 
+
+In this case, though both tests yielded the same results, the Chi-Squared test is more appropriate given the sample size. Typically, most researchers adhere to following: "if ≤ 20% of expected cell counts are less than 5, then use the chi-square test; if > 20% of expected cell counts are less than 5, then use Fisher’s exact test." [(Source)](https://www.ccjm.org/content/84/9_suppl_2/e20#:~:text=For%20simplicity%2C%20most%20researchers%20adhere,then%20use%20Fisher's%20exact%20test)
