@@ -1546,8 +1546,8 @@ for constant failure rates, service times, etc.</p>
 <hr />
 <p>The three distributions, <span class="math inline">\(X, Y\)</span>,
 and <span class="math inline">\(Z\)</span>, are created below
-empirically using parameters <span class="math inline">\(n=10\)</span>
-and <span class="math inline">\(\lambda=5\)</span>:</p>
+empirically using parameters <span class="math inline">\(n=6\)</span>
+and <span class="math inline">\(\lambda=2\)</span>:</p>
 <pre class="r"><code>set.seed(seed_num)
 
 samples &lt;- 10000
@@ -1729,7 +1729,7 @@ M_X(t) &amp;= \frac{\lambda}{\lambda - t}
 \]</span></p>
 <p>Given that <span class="math inline">\(E[X] = M&#39;_X(0)\)</span>,
 we can use this moment generating function to determine the expected
-value of the exponential distribution. To start we take the first
+value of the exponential distribution. To start, we take the first
 derivative of <span class="math inline">\(M_X(t)\)</span>:</p>
 <p><span class="math display">\[
 \begin{align}
@@ -1794,7 +1794,7 @@ P(A|B) = \frac{P(B|A) \cdot P(A)}{P(B)}
 <p>In this case, <span class="math inline">\(P(B|A) = P(Z &gt; \lambda/2
 \ |\  Z &gt; \lambda) = 1\)</span>, since if <span class="math inline">\(Z\)</span> is greater than <span class="math inline">\(\lambda\)</span> it must also be greater than
 <span class="math inline">\(\lambda / 2\)</span>. Thus, we can easily
-compute <span class="math inline">\(P\)</span> by dividing <span class="math inline">\(P(A)\)</span> by <span class="math inline">\(P(B)\)</span>. This is done in the cell below:</p>
+compute <span class="math inline">\(P(A | B)\)</span> by dividing <span class="math inline">\(P(A)\)</span> by <span class="math inline">\(P(B)\)</span>. This is done in the cell below:</p>
 <pre class="r"><code>P_A &lt;- length(which(Z &gt; l)) / samples
 P_B &lt;- length(which(Z &gt; l/2)) / samples
 P &lt;- P_A / P_B
@@ -2026,9 +2026,8 @@ joint_marginal_table</code></pre>
 ## 4th Quar. Z 0.095732305 0.129541700 0.169114557  0.40791097 0.80229953
 ## Sum         0.119322399 0.161463013 0.210787307  0.50842728 1.00000000</code></pre>
 <p>We can now use this joint/marginal probability table to investigate
-whether or not <span class="math inline">\(P(Y, Z) = P(Y)\cdot
-P(Z)\)</span>, by creating a matrix which contains compares the two
-values:</p>
+whether or not <span class="math inline">\(P(YZ) = P(Y)P(Z)\)</span>, by
+creating a matrix which compares the two values:</p>
 <pre class="r"><code>check_mat &lt;- matrix(nrow = 0, ncol=5)
 
 for(i in 1:4){
@@ -2042,9 +2041,9 @@ for(i in 1:4){
 }
 
 check_mat &lt;- unname(check_mat)
-colnames(check_mat) &lt;- c(&#39;Y Quar&#39;, &#39;Z Quar&#39;, &#39;P(Y,Z)&#39;, &#39;P(Y)P(Z)&#39;, &#39;Diff&#39;)
+colnames(check_mat) &lt;- c(&#39;Y Quar&#39;, &#39;Z Quar&#39;, &#39;P(YZ)&#39;, &#39;P(Y)P(Z)&#39;, &#39;Diff&#39;)
 check_mat</code></pre>
-<pre><code>##       Y Quar Z Quar      P(Y,Z)    P(Y)P(Z)         Diff
+<pre><code>##       Y Quar Z Quar       P(YZ)    P(Y)P(Z)         Diff
 ##  [1,]      1      1 0.002813712 0.002813712 4.336809e-19
 ##  [2,]      1      2 0.003807419 0.003807419 0.000000e+00
 ##  [3,]      1      3 0.004970523 0.004970523 0.000000e+00
@@ -2061,7 +2060,7 @@ check_mat</code></pre>
 ## [14,]      4      2 0.129541700 0.129541700 0.000000e+00
 ## [15,]      4      3 0.169114557 0.169114557 0.000000e+00
 ## [16,]      4      4 0.407910969 0.407910969 0.000000e+00</code></pre>
-<p>As we can see from the above, it is clear that <span class="math inline">\(P(Y, Z) = P(Y)P(Z)\)</span> for every joint
+<p>As we can see from the above, it is clear that <span class="math inline">\(P(YZ) = P(Y)P(Z)\)</span> for every joint
 probability. Thus, we say with a high degree of confidence that <span class="math inline">\(Y\)</span> and <span class="math inline">\(Z\)</span> are independent events.</p>
 </div>
 </div>

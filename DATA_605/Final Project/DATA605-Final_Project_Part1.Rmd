@@ -33,7 +33,7 @@ NOTE: The Gamma distribution is quite common in data science.  For example, it i
 
 ---
 
-The three distributions, $X, Y$, and $Z$, are created below empirically using parameters $n=10$ and $\lambda=5$:
+The three distributions, $X, Y$, and $Z$, are created below empirically using parameters $n=6$ and $\lambda=2$:
 
 ```{r}
 set.seed(seed_num)
@@ -196,7 +196,7 @@ M_X(t) &= \frac{\lambda}{\lambda - t}
 \end{align}
 $$
 
-Given that $E[X] = M'_X(0)$, we can use this moment generating function to determine the expected value of the exponential distribution. To start we take the first derivative of $M_X(t)$:
+Given that $E[X] = M'_X(0)$, we can use this moment generating function to determine the expected value of the exponential distribution. To start, we take the first derivative of $M_X(t)$:
 
 
 $$
@@ -253,7 +253,7 @@ $$
 P(A|B) = \frac{P(B|A) \cdot P(A)}{P(B)}
 $$
 
-In this case, $P(B|A) = P(Z > \lambda/2 \ |\  Z > \lambda) = 1$, since if $Z$ is greater than $\lambda$ it must also be greater than $\lambda / 2$. Thus, we can easily compute $P$ by dividing $P(A)$ by $P(B)$. This is done in the cell below:
+In this case, $P(B|A) = P(Z > \lambda/2 \ |\  Z > \lambda) = 1$, since if $Z$ is greater than $\lambda$ it must also be greater than $\lambda / 2$. Thus, we can easily compute $P(A | B)$ by dividing $P(A)$ by $P(B)$. This is done in the cell below:
 
 ```{r}
 P_A <- length(which(Z > l)) / samples
@@ -453,7 +453,7 @@ rownames(joint_marginal_table) <- c('1st Quar. Z', '2nd Quar. Z',
 joint_marginal_table
 ```
 
-We can now use this joint/marginal probability table to investigate whether or not $P(Y, Z) = P(Y)\cdot P(Z)$, by creating a matrix which contains compares the two values:
+We can now use this joint/marginal probability table to investigate whether or not $P(YZ) = P(Y)P(Z)$, by creating a matrix which compares the two values:
 
 ```{r}
 check_mat <- matrix(nrow = 0, ncol=5)
@@ -469,11 +469,11 @@ for(i in 1:4){
 }
 
 check_mat <- unname(check_mat)
-colnames(check_mat) <- c('Y Quar', 'Z Quar', 'P(Y,Z)', 'P(Y)P(Z)', 'Diff')
+colnames(check_mat) <- c('Y Quar', 'Z Quar', 'P(YZ)', 'P(Y)P(Z)', 'Diff')
 check_mat
 ```
 
-As we can see from the above, it is clear that $P(Y, Z) = P(Y)P(Z)$ for every joint probability. Thus, we say with a high degree of confidence that $Y$ and $Z$ are independent events. 
+As we can see from the above, it is clear that $P(YZ) = P(Y)P(Z)$ for every joint probability. Thus, we say with a high degree of confidence that $Y$ and $Z$ are independent events. 
 
 # Part G
 

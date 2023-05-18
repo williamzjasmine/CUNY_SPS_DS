@@ -1,5 +1,5 @@
 ---
-title: "Data 605 - Final Project - Part 2"
+title: "Predicting House Sale Prices in Ames, Iowa"
 author: "William Jasmine"
 date: "2023-05-17"
 output:
@@ -10,6 +10,10 @@ output:
       smooth_scroll: false
   pdf_document: default
 ---
+
+# Setup/Imports
+
+The section below sets shows all the imports needed to run the `.rmd` file: 
 
 ```{r, message=FALSE}
 library(gridExtra)
@@ -25,14 +29,14 @@ library(lmtest)
 
 # Introduction
 
-This part of the assignment involves using data from Kaggle's [Housing Prices: Advanced Regression Techniques competition](https://www.kaggle.com/c/house-prices-advanced-regression-techniques). The data from this page is loaded in the cell below:
+The work presented here uses data from Kaggle's [Housing Prices: Advanced Regression Techniques competition](https://www.kaggle.com/c/house-prices-advanced-regression-techniques). The data from this page is loaded in the cell below:
 
 ```{r}
 df <- read.csv("Data/train.csv")
 dim(df)
 ```
 
-Each observation from the dataset in this case represents a home sale made in Ames, Iowa. We see from the above output that it contains data from 1,460 home sales, each having information pertaining to 79 different explanatory variables. The dataset also includes the target variable, `sale price`. To help limit the scope of the data, the following cell filters out a subset of 9 of explanatory fields (along with the target variable):
+Each observation from the dataset in this case represents a home sale made in Ames, Iowa. We see from the above output that it contains data from 1,460 home sales, each having information pertaining to 79 different explanatory variables. The dataset also includes the target variable, `sale price`. To help limit the scope of the data, the following cell filters out a subset of 9 explanatory fields (along with the target variable):
 
 ```{r}
 df <- df %>% dplyr::select(
@@ -80,7 +84,7 @@ print(table(df$BldgType))
 print(table(df$Neighborhood))
 ```
 
-We see right away from the table above that the variable `Utilities` is the same for all houses except one, and as such will end up having little to no predictive power. As such, it is removed in the cell below:
+We see right away from the table above that the variable `Utilities` is the same for all houses except one, and as such will end up having little to no predictive power. Thus, it is removed in the cell below:
 
 ```{r}
 df <- df %>% 
@@ -109,9 +113,9 @@ numeric_fields %>%
 
 ```
 
-We see that most of the distributions maintain a certain level of normality, with the exception of `YrSold` and `YearBuilt`. In the `YrBuilt` distribution, we can clearly see the presence of the different housing booms experienced by the United States. 
+We see that most of the distributions maintain a certain level of normality, with the exception of `YrSold` and `YearBuilt`. In the `YrBuilt` distribution, we can clearly see the presence of the different housing booms experienced in the United States. 
 
-The below creates scatterplots of our numeric fields with the target variable, `SalePrice`: 
+The cell below creates scatterplots of our numeric fields with the target variable, `SalePrice`: 
 
 ```{r}
 sp1 <- ggplot(data=df, aes(OverallCond, SalePrice)) + geom_point() +
@@ -131,9 +135,9 @@ scatterplots <- list(sp1, sp2, sp3, sp4, sp5, sp6)
 grid.arrange(grobs=scatterplots, ncol=2)
 ```
 
-Overall, we can see positive correlation with all the chosen explanatory variables with the exception of maybe `YrSold` and `OverallCond`, indicating that most of these variables may prove useful when actually building our model. 
+Overall, we can see a certain level of (mostly positive) correlation with all the chosen explanatory variables with the exception of `YrSold`, indicating that most of these variables may prove useful when actually building our model. 
 
-We can check the correlation between the independent by producing a correlation matrix: 
+We can check the correlation between the independent variables by producing a correlation matrix: 
 
 ```{r}
 ggpairs(dplyr::select(numeric_fields, -SalePrice), axisLabels = "none")
@@ -172,6 +176,15 @@ cor_df <- cor_df %>%
 cor_df
 ```
 
+Because the above output is the result of conducting a series of the same hypothesis tests, family-wise error should be a concern. The family-wise error rate can be calculated via the expression $1-(1-\alpha)^n$, where $n$ is the number of tests and $\alpha$ is the significance level chosen. Thus, as the number of hypothesis test conducted increases the probability of making a type 1 error (false positive) increases. One way to account to family-wise error is to apply what is known as a Bonferroni correction, in which the desired significance level is modified by dividing it by the number of tests: $\alpha_{\text{new}}= \alpha_{\text{old}}/n$. In this case, that means that the new level of significance should be $0.05 / 16 = 0.003125$. We see now that while all 16 of the correlation hypothesis tests performed earlier were below the original significance level, only 10 result in a $p$-value below this new level:
+
+```{r}
+a <- 0.05 /16
+length(which((cor_df$p_value < a) == TRUE))
+
+```
+
+
 # Evaluate Collinearity Using Precision Matrix
 
 We can get the precision matrix by inverting the correlation matrix:
@@ -188,7 +201,7 @@ round(cor_mat %*% precision_mat)
 round(precision_mat %*% cor_mat)
 ```
 
-We can also generate the $LU$ decomposition of the precision matrix:
+We can also generate the LU decomposition of the precision matrix:
 
 ```{r}
 decomp <- lu.decomposition(precision_mat)
@@ -202,7 +215,7 @@ Given a matrix $M$, the process of LU decomposition returns a lower triangular m
 round(L %*% U, 5) == round(precision_mat, 5)
 ```
 
-The diagonal of the precision matrix provide variance inflation factors (VIF), which provide us with another way to analyze the multicollinearity between the explanatory variables:
+The diagonal of the precision matrix hold the variance inflation factors (VIFs), which provide us with another way to analyze the multicollinearity between the explanatory variables:
 
 * VIF equal to 1 = variables are not correlated.
 * VIF between 1 and 5 = variables are moderately correlated.
@@ -212,7 +225,7 @@ The diagonal of the precision matrix provide variance inflation factors (VIF), w
 rbind(colnames(numeric_fields), diag(precision_mat))
 ```
 
-We can see that there is some level of collinearity among all of our explanatory variables (once again, with the exception of `YrSold`). This is expected, given the high level of correlation that the other variables had with one another. However, VIF is typically a better indicator of collinearity than correlation, and generally it is accepted that predictor variables with VIF values less than 5 are acceptable to use in a linear model. 
+We can see that there is some level of collinearity among all of our explanatory variables (once again, with the exception of `YrSold`) using this methodology. This is expected, given the high level of correlation that the other variables had with one another. However, VIF is typically a better indicator of collinearity than correlation, and generally it is accepted that predictor variables with VIF values less than 5 are acceptable to use in a linear model. 
 
 # Fitting the Target Variable
 
@@ -232,7 +245,7 @@ print(median(df$SalePrice))
 print(mean(df$SalePrice))
 ```
 
-As such, it could be appropriate to attempt to fit this the distribution of `SalePrice` to an exponential probability density function (PDF). The exponential distribution, given by the formula below:
+As such, it could be appropriate to attempt to fit the distribution of `SalePrice` to an exponential probability density function (PDF). The exponential distribution, given by the formula below:
 
 $$
 \begin{equation}
@@ -244,8 +257,7 @@ f_X(x) =
 \end{equation}
 $$
 
-only has one parameter $\lamba$ that is required for the fit. The best-fit value of $\lambda$ is determined below using the `fitdistr` function: 
-
+only has one parameter $\lambda$ that is required for the fit. The best-fit value of $\lambda$ is determined below using the `fitdistr` function: 
 
 ```{r}
 l_fit <-unname(fitdistr(df$SalePrice, densfun = 'exponential')$estimate)
@@ -306,7 +318,7 @@ set.seed(42)
 quantile(sim_dist, probs=c(0.05, 0.95))
 ```
 
-Comparing the two the theoretical and empirical yields a solid agreement, which would only improve given a larger number of samples. 
+Comparing the theoretical and empirical yields solid agreement, which would only improve given a larger number of samples. 
 
 Finally, we can use this empirical distribution to estimate the mean, and provide a 95% confidence interval:
 
@@ -328,7 +340,7 @@ mean(df$SalePrice)
 
 ## Building Model 
 
-Before building a linear regression model, the cell below converts the two remaining categorical variables `Neighborhood` and `BldgType` into dummy variables, in the hopes unhelpful categories from each can be removed from the model if they are not effective predictors. 
+Before building a linear regression model, the cell below converts the two remaining categorical variables `Neighborhood` and `BldgType` into dummy variables. This is done in the hopes unhelpful categories from each can be removed from the model if they are not effective predictors. 
 
 ```{r}
 df <- dummy_cols(df, select_columns = c('BldgType', 'Neighborhood'),
@@ -360,7 +372,7 @@ lm_summary <- summary(lm)
 lm_summary
 ```
 
-The $R^2$ value remains unchanged despite having reduced the number of features in our model by 17, giving further evidence to the fact that they were insignificant predictors. 
+The $R^2$ value remains unchanged despite having reduced the number of features in our model by 17, giving further evidence to the fact that they were not helpful to the linear regression model. 
 
 ## Testing Assumptions
 
@@ -381,7 +393,7 @@ The four assumptions of linear regression are the following:
 
 ### Linear Relationship
 
-The scatterplots created earlier show that all of the numeric fields appear to exhibit a linear relationship with the exception of `YrSold`, which has now been removed from the model. We can assume that the linear relationship is met for our remaining dummy categorical variables, since each field only contains two values (0 or 1), and we can fit a straight line perfectly to any two points.
+The scatterplots created earlier show that all of the numeric fields appear to exhibit a linear relationship with the exception of `YrSold`, which has now been removed from the model. We can assume that the linear relationship is met for our remaining dummy categorical variables, since each field only contains two values (0 or 1) and we can fit a straight line perfectly to any two points.
 
 ### Normality
 
@@ -446,7 +458,7 @@ test_df <- test_df %>%
 preds <- predict(lm, test_df)
 ```
 
-The above sets up the testing data in the same way as the test data, and then uses it to create predictions, which are stored in `preds`. The cell below then creates a dataframe of these predictions that can be used to create a `.csv` file that can be uploaded to Kaggle. 
+The above sets up the testing data in the same way as the training data, and then uses it to create predictions, which are stored in `preds`. The cell below then creates a dataframe of these predictions with the intention of producing a `.csv` file that can be uploaded to Kaggle. 
 
 ```{r}
 preds <- cbind(id_field, preds)
@@ -483,7 +495,7 @@ ggplot(data = cooks, aes(x = row_num, y = d_c)) +
         ylim(0, 0.01)
 ```
 
-The cell below rebuilds our linear model with after first removing these outlier observations from the training set: 
+The red line in the plot above represents the $\frac{4}{n}$ threshold, and as such it is clear that there are indeed a number of outliers in our dataset. The cell below rebuilds our linear model after first removing these outlier observations: 
 
 ```{r}
 cooksD <- cooks.distance(lm)
@@ -526,3 +538,4 @@ it results in a much worse Kaggle score of 0.45855. Thus, despite the higher $R^
 
 # Conclusion 
 
+The work presented here shows that a linear regression model can predict home sale prices in Ames, Iowa with above average accuracy. Overall, the final model boasts a R$^2$ of over 0.81, and provides reasonable predictions on a testing dataset. The quality of the model could still likely be improved given a more in-depth feature analysis, the inclusion of more observations, and switching models completely (i.e. to random forest regressor). 
