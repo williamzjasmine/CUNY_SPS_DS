@@ -1,0 +1,6 @@
+1. Read the attached article by Villalta and Whitwell
+2. Download the U.S. GDP Growth Rate 1961 - 2022 dataset from (https://www.macrotrends.net/countries/USA/united-states/gdp-growth-rate)
+3. Download the Federal Funds Effective Rate dataset from (https://fred.stlouisfed.org/series/FEDFUNDS)
+4. Determine the degree of correlation (or negative correlation) between these two data sets (hints on Correlation of Two Variables in a Time Series in Python - https://stackoverflow.com/questions/4809577/correlation-of-two-variables-in-a-time-series-in-python) [N.b.: Use of Python for this analysis is recommended but not required]
+5. Download the Bureau of Labor Statistics Consumer Price Index Dataset from https://www.usinflationcalculator.com/inflation/consumer-price-index-and-annual-percent-changes-from-1913-to-2008/ and determine the correlation (or negative correlation) between the annual inflation rate and the Feds Fund Rate.
+6. Post your conclusions from this analysis regarding Villalt and Whitwell assertions regarding Economically Sensitive Exposures, Interest Rate Sensitive Exposures and the actions of the FED. on the Discussion Board and respond to the postings of others. [This discussion will be graded and has a maximum of 50 earned value points.]
