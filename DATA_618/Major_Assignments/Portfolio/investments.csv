@@ -1,6 +1,6 @@
 investment_type,GCIS_sector,name,country_of_origin,ticker,price_per_unit,initial_investment,number_of_units
 stocks,Energy,Exxon Mobil Corp,U.S.,XOM,116.7,400000,3427.592117
-stocks,Energy,PetroChina Co Ltd,China,PCCYF,64.65,400000,6187.16164
+stocks,Energy,PetroChina Co Ltd,China,PCCYF,0.66,400000,606060.6061
 stocks,Energy,NextEra Energy Inc.,U.S.,NEE,68.64,200000,2913.752914
 stocks,Materials,BHP Group Ltd,Austrailia,BHP,58.45,100000,1710.863986
 stocks,Materials,Air Products & Chemicals Inc,U.S.,APD,302.11,100000,331.005263
@@ -26,8 +26,8 @@ stocks,Utilities,National Grid PLC,England,NG,1273.28,150000,117.8059814
 stocks,Utilities,Iberdrola SA,Spain,IBDRY,11.83,150000,12679.62806
 stocks,Real Estate,Prologis Inc,U.S.,PLD,123.18,150000,1217.730151
 stocks,Real Estate,Public Storage Operating CO,U.S.,PSA,274.11,150000,547.2255664
-crypto,N/A,Bitcoin,N/A,BTC-USD,26557.04,200000,7.530959776
-crypto,N/A,Ethereum,N/A,ETH-USD,1635.17,200000,122.3114416
-bonds,N/A,10 Year  U.S. Treasury Note,U.S.,^TNX,,500000,
-bonds,N/A,Vanguard Total International Bond ETF,Foreign,BNDX,48.27,500000,10358.40066
-bonds,N/A,iShares iBoxx $ Investment Grade Corporate Bond ETF,U.S.,LQD,104.37,600000,5748.778385
+crypto,crypto,Bitcoin,N/A,BTC-USD,26557.04,200000,7.530959776
+crypto,crypto,Ethereum,N/A,ETH-USD,1635.17,200000,122.3114416
+bonds,bonds,iShares US Treasury Bond ETF,U.S.,GOVT,21.77,500000,22967.39
+bonds,bonds,Vanguard Total International Bond ETF,Foreign,BNDX,48.27,500000,10358.40066
+bonds,bonds,iShares iBoxx $ Investment Grade Corporate Bond ETF,U.S.,LQD,104.37,600000,5748.778385
