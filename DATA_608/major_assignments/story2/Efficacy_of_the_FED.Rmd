@@ -1,0 +1,286 @@
+---
+title: "Story 2 - Efficacy of the FED"
+author: "William Jasmine"
+date: "2023-09-27"
+output:
+  html_document: default
+  pdf_document: default
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Imports
+
+The cell below imports all packages needed to run this R markdown file.
+
+```{r, results=FALSE, warning=FALSE, message=FALSE}
+library(devtools)
+library(blsAPI)
+library(rjson)
+library(tidyverse)
+```
+
+# Instructions
+
+The Federal Reserve's mandate from Congress is to control inflation and to maintain low unemployment. These seem to be contradictory objectives.
+
+For this story you will need to source the following data for the last 25 years:
+
+* The Consumer Price Index (CPI) (Bureau of Labor Statistics)
+
+* The FED Funds Rate (FRED) (Federal Reserve Board)
+
+* Unemployment Rate  (Bureau of Labor Statistics)
+
+Your Data Visualizations should be designed to answer the question: **"Has the FED been able to fulfill the mandate given to it by Congress?"**
+
+# Gathering Data
+
+First, the cell below uses the publically available API from the Bureau of Labor Statistics (BLS) to pull the monthly Consumer Price Index (CPI) for all goods from January 1998 to August 2023 (last ~25 years). More information on how to pull the pertinent data from the API can be found on the BLS [website](https://www.bls.gov/help/hlpforma.htm#AP). 
+
+```{r}
+# only can include data for 10 years in each payload (need to split query)
+
+# create payloads
+payload1 <- list('seriesid'=c('CUUR0000SA0'), 
+                 'startyear'=1998, 'endyear'=2008,
+                 'registrationKey'='fec0da0eb7b9457a98f9babf068f5364')
+payload2 <- list('seriesid'=c('CUUR0000SA0'),
+                 'startyear'=2008, 'endyear'=2018,
+                 'registrationKey'='fec0da0eb7b9457a98f9babf068f5364')
+payload3 <- list('seriesid'=c('CUUR0000SA0'), 
+                 'startyear'=2018, 'endyear'=2023,
+                 'registrationKey'='fec0da0eb7b9457a98f9babf068f5364')
+
+# send API request, convert to dataframe.
+response1 <- blsAPI(payload1)
+json1 <- fromJSON(response1)
+df1 <- apiDF(json1$Results$series[[1]]$data)
+
+response2 <- blsAPI(payload2)
+json2 <- fromJSON(response2)
+df2 <- apiDF(json2$Results$series[[1]]$data)
+
+response3 <- blsAPI(payload3)
+json3 <- fromJSON(response3)
+df3 <- apiDF(json3$Results$series[[1]]$data)
+
+# join dataframes together, clean, and display.
+cpi_df <- rbind(df1, df2, df3)
+cpi_df <- select(cpi_df, 1, 2, 4)
+colnames(cpi_df) <- c('year', 'period', 'cpi')
+cpi_df$cpi <- as.numeric(cpi_df$cpi)
+head(cpi_df)
+```
+
+The data from the code shown above is stored in the `cpi_df` dataframe. 
+
+Next, the cell below creates and processes another API query that pulls the federal unemployment rate for the same time period. This data is stored in a dataframe called `uer_df`.
+
+```{r}
+# only can include data for 10 years in each payload (need to split query)
+
+# create payloads
+payload1 <- list('seriesid'=c('LAUST360000000000003'), 
+                 'startyear'=1998, 'endyear'=2008,
+                 'registrationKey'='fec0da0eb7b9457a98f9babf068f5364')
+payload2 <- list('seriesid'=c('LAUST360000000000003'),
+                 'startyear'=2008, 'endyear'=2018,
+                 'registrationKey'='fec0da0eb7b9457a98f9babf068f5364')
+payload3 <- list('seriesid'=c('LAUST360000000000003'), 
+                 'startyear'=2018, 'endyear'=2023,
+                 'registrationKey'='fec0da0eb7b9457a98f9babf068f5364')
+
+# send API request, convert to dataframe.
+response1 <- blsAPI(payload1)
+json1 <- fromJSON(response1)
+df1 <- apiDF(json1$Results$series[[1]]$data)
+
+response2 <- blsAPI(payload2)
+json2 <- fromJSON(response2)
+df2 <- apiDF(json2$Results$series[[1]]$data)
+
+response3 <- blsAPI(payload3)
+json3 <- fromJSON(response3)
+df3 <- apiDF(json3$Results$series[[1]]$data)
+
+# join dataframes together, clean, and display.
+uer_df <- rbind(df1, df2, df3)
+uer_df <- select(uer_df, 1, 2, 4)
+colnames(uer_df) <- c('year', 'period', 'unemployment_rate')
+uer_df$unemployment_rate <- as.numeric(uer_df$unemployment_rate)
+head(uer_df)
+```
+
+Lastly, the cell below pulls in data on the Federal Funds Rate (FFR) from the Federal Reserve's [publically available data sources](https://www.federalreserve.gov/data.htm). A `csv` was created that contains monthly data of the FFR (also for the last 25 years), which is converted and stored in the dataframe `ffr_df`:
+
+```{r}
+ffr_df <- read.csv('federal_funds_rates.csv')
+colnames(ffr_df) <- c('month', 'ffr')
+ffr_df$month <- paste(ffr_df$month, '-01', sep='')
+head(ffr_df)
+```
+
+In preparation of joining the three dataframes, the cell below cleans what will become the key column of each so that they are all in the same format (and thus, joinable). 
+
+```{r}
+cpi_df$period <- substring(cpi_df$period, 2)
+cpi_df$month <- paste(cpi_df$year, '-', cpi_df$period, '-01', sep='')
+cpi_df <- cpi_df %>%
+  select(month, cpi) %>% arrange(month)
+
+uer_df$period <- substring(uer_df$period, 2)
+uer_df$month <- paste(uer_df$year, '-', uer_df$period, '-01', sep='')
+uer_df <- uer_df %>%
+  select(month, unemployment_rate) %>% arrange(month)
+```
+
+Now that each of the individual components have been properly cleaned, they can be joined together:
+
+```{r}
+df <- cpi_df %>%
+  left_join(uer_df, by='month') %>% left_join(ffr_df, by='month')
+df$month <- as.Date(df$month)
+head(df)
+```
+
+As can be seen from the above, `df` is the final dataframe containing information from all three of our data sources. 
+
+# Analysis
+
+First, the cell below calculates the monthly rate of inflation using the data in the `cpi` column of `df`. To calculate we need both the CPI in the current month $c_f$ and the CPI one year earlier $c_i$. The rate of inflation $I$ is then:
+
+$$
+I = \frac{c_f - c_i}{c_i} \cdot 100
+$$
+
+
+```{r}
+df$last_month_cpi <- lag(df$cpi, n=12)
+df$inflation <- ((df$cpi - df$last_month_cpi) / df$last_month_cpi) * 100
+df <- select(df, -last_month_cpi)
+df <- tail(df, nrow(df) - 12)
+df <- head(df, nrow(df) - 1)
+head(df)
+```
+
+The cell below uses `df` to prepare a separate dataframe that will be more useful for plotting purposes.
+
+```{r}
+plt_df <- df
+plt_df <- select(df, -cpi)
+colnames(plt_df) <- c('Month', 'Unemployment', 'FFR', 'Inflation')
+
+plt_df <- plt_df %>% 
+    pivot_longer(!Month)
+
+colnames(plt_df) <- c('Month', 'Metric', 'Value')
+head(plt_df)
+```
+
+We can now attempt to answer the question of whether or not the Federal Reserve is able to fulfill its mandate and keep both inflation and unemployment at reasonable levels. To get a better understanding of how these values shift over time, the code below produces a plot that shows how inflation, unemployment, and the federal funds rate have changed over time: 
+
+```{r, warning=FALSE}
+ggplot(data = plt_df, aes(x=Month, y=Value, group=Metric, color=Metric)) +
+  geom_line() +
+  xlab("Year") +
+  ylab("Value (%)") + 
+  scale_x_date(date_labels="%Y",date_breaks  ="2 year")
+
+```
+
+While the plot above does seem to indicate that changing the Federal Funds rate affects both the levels of unemployment and inflation, it does not give reliable insight into how. As such, we can instead look at how the effect of changing the FFR $x$ months into the past affects the inflation (or unemployment) rate $y$ months into the future. The cell below checks to see for which combination of $x$ and $y$ changing FFR and inflation (or unemployment) rates are most correlated:
+
+```{r}
+cors <- c()
+num_months <- 24
+corrs <- data.frame(i=integer(), j=integer(), r_inf=double(), r_uer=double())
+
+for(i in 1:num_months){ 
+  tmp <- df
+  tmp$ffr_lag <- lag(tmp$ffr, i)
+  tmp$ffr_change <- tmp$ffr - tmp$ffr_lag
+  for(j in 1:num_months){
+    tmp$inf_lead <- lead(tmp$inflation, j) 
+    tmp$inf_change <- tmp$inf_lead - tmp$inflation
+    tmp$uer_lead <- lead(tmp$unemployment_rate, j)
+    tmp$uer_change <- tmp$uer_lead - tmp$unemployment_rate
+    tmp <- na.omit(tmp)
+    r_inf <- cor(tmp$inf_change, tmp$ffr_change)
+    r_uer <- cor(tmp$uer_change, tmp$ffr_change)
+    row <- c(i, j, r_inf, r_uer)
+    corrs[(i-1)*12+j,] <- row
+  }
+}
+corrs <- na.omit(corrs)
+head(corrs)
+```
+
+We can then use these correlation values to select look-back and look-ahead periods of interest in order to plot them over time. This is done in the cell below in order to compare the change in FFR and inflation rate: 
+
+```{r}
+
+lookback <- 23
+lookahead <- 24
+
+tmp <- df
+tmp$ffr_lag <- lag(tmp$ffr,lookback)
+tmp$ffr_change <- tmp$ffr - tmp$ffr_lag
+tmp$inf_lead <- lead(tmp$inflation, lookahead) 
+tmp$inf_change <- tmp$inf_lead - tmp$inflation
+tmp <- na.omit(tmp)
+
+plt_df <- tmp
+plt_df <- select(tmp, month, inf_change, ffr_change)
+colnames(plt_df) <- c('Month', 'Inflation Change (6 Months Ahead)', 'FFR Change (3 Months Prior)')
+
+plt_df <- plt_df %>% 
+    pivot_longer(!Month)
+
+colnames(plt_df) <- c('Month', 'Metric', 'Value')
+
+ggplot(data = plt_df, aes(x=Month, y=Value, group=Metric, color=Metric)) +
+  geom_line() +
+  xlab("Year") +
+  ylab("Value (%)") + 
+  scale_x_date(date_labels="%Y",date_breaks  ="2 year")
+```
+
+We can see from the above graph that the FFR rate changes tend to be on the opposite side of the inflation rate changes, which means that when inflation starts getting too high, the FED begins to raise interest rates. 
+
+A similar picture is plotted below showing the comparison of the FFR and unemployment rate:
+
+```{r}
+lookback <- 23
+lookahead <- 24
+
+tmp <- df
+tmp$ffr_lag <- lag(tmp$ffr,lookback)
+tmp$ffr_change <- tmp$ffr - tmp$ffr_lag
+tmp$uer_lead <- lead(tmp$inflation, lookahead) 
+tmp$uer_change <- tmp$uer_lead - tmp$unemployment_rate
+tmp <- na.omit(tmp)
+
+plt_df <- tmp
+plt_df <- select(tmp, month, uer_change, ffr_change)
+colnames(plt_df) <- c('Month', 'Unemployment Change (6 Months Ahead)', 'FFR Change (3 Months Prior)')
+
+plt_df <- plt_df %>% 
+    pivot_longer(!Month)
+
+colnames(plt_df) <- c('Month', 'Metric', 'Value')
+
+ggplot(data = plt_df, aes(x=Month, y=Value, group=Metric, color=Metric)) +
+  geom_line() +
+  xlab("Year") +
+  ylab("Value (%)") + 
+  scale_x_date(date_labels="%Y",date_breaks  ="2 year")
+
+```
+
+Once again, we see opposing peaks that indicate when unemployment starts to rise the FED begins to lower interest rates. 
+
+# Conclusion
+
+Based on the results of the visualizations shown above, it is clear that the FED does its best to fulfill its mandate from congress: it uses interest rates as a way to both curb inflation and unemployment. 
