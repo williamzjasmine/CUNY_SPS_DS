@@ -1,0 +1,282 @@
+---
+title: "Data 622 - Week 4 Discussion - LDA vs Logistic Regression"
+author: "William Jasmine"
+date: "2024-02-25"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+# Libraries and setup
+
+```{r setup, results=FALSE, message=FALSE}
+library(tidyverse)
+library(ISLR)
+library(MASS)
+library(ggplot2)
+library(data.table)
+seed_num <- 42
+```
+
+# Example - LDA vs BLR
+
+First, the cell below creates two normally distributed predictor variables, $x_1$ and $x_2$. 1,000 samples are generated for each.  
+
+```{r}
+set.seed(seed_num)
+
+# x1_c1 <- rnorm(100, 0)
+# x2_c1 <- rnorm(100, 8)
+# 
+# x1_c2 <- rnorm(100, 4)
+# x2_c2 <- rnorm(100, 12)
+# 
+# x1 <- c(x1_c1, x1_c2)
+# x2 <- c(x2_c1, x2_c2)
+
+x1 <- rnorm(1000, 0, 2)
+x2 <- rnorm(1000, 2, 1)
+
+
+p1 <- data.frame(X = x1)
+p2 <- data.frame(X = x2)
+p1$var <- 'x1'
+p2$var <- 'x2'
+plt_df <- rbind(p1, p2)
+ggplot(plt_df, aes(X, fill = var)) + geom_density(alpha = 0.2)
+```
+
+We see from the density plots above that both predictors appear normal with differing $\mu$ and $\sigma$. Note that normally distributed predictors is one of the assumptions of linear discriminant analysis (LDA), which is not true of binomial logistic regression (BLR).
+
+The cell below uses a line of slope $m = -0.2$ and y-intercept $b = 2$ to create a hypothetical border separating the points into two separate classes. 
+
+```{r}
+cutoff_x <- seq(-6, 6, length.out = 1000)
+m <- -0.2
+b <- 2
+# m <- -2
+# b <- 14
+cutoff_y <- (m * cutoff_x) + b
+df <- data.frame(x1 = x1, x2 = x2, cutoff_x = cutoff_x, cutoff_y = cutoff_y)
+plt <- ggplot(data = df) + 
+  geom_point(aes(x=x1, y=x2)) +
+  geom_line(aes(x=cutoff_x, y=cutoff_y), color='red')
+plt
+```
+
+Using this line to separate the points gives the following:
+
+```{r}
+df <- df  %>% mutate(
+  class = case_when(
+    x2 < m * x1 + b ~ FALSE,
+    TRUE ~ TRUE
+  )
+)
+
+plt <- ggplot(data = df) + 
+  geom_point(aes(x=x1, y=x2, color=class)) 
+plt
+```
+
+To prevent there being a perfect linear separation between the two classes (logistic regression will not work if this is the case) the cell below randomly switches the class of 50 of the data points, and updates the plot:
+
+```{r}
+set.seed(seed_num)
+df$class_new <- df$class
+changes <- floor(runif(50, min=0, nrow(df)))
+for (change in changes) {
+  df$class_new[change] <- !df$class_new[change]
+}
+
+plt <- ggplot(data = df) + 
+  geom_point(aes(x=x1, y=x2, color=class_new)) 
+plt
+```
+
+We see that the covariance matrices of the individual classes are the essentially the same, which is another assumption of LDA (note that so long as the points that switch class are chosen at random, this should always hold true). 
+
+```{r}
+cov1 <- cov(dplyr::select(filter(df, class_new==1), x1, x2))
+cov2 <- cov(dplyr::select(filter(df, class_new==0), x1, x2))
+print(cov1)
+print(cov2)
+```
+
+Next, the cell below separates the data into training and testing datasets.
+
+```{r}
+# define training data cutoff
+train_size = 0.75
+cutoff = floor(train_size * nrow(df))
+
+# split data randomly into train and test set
+set.seed(1234)
+tmp_df <- dplyr::select(df, x1, x2, class_new)
+train_ind <- sample(seq_len(nrow(df)), size=cutoff)
+train <- tmp_df[train_ind, ]
+test <- tmp_df[-train_ind, ]
+```
+
+First, the BLR model is fitted using the training data:
+
+```{r}
+blr <- glm(class_new ~ x1 + x2, data = train, family = "binomial")
+summary(blr)
+```
+
+Followed by the LDA model:
+
+```{r}
+lda <- lda(class_new ~ x1 + x2, data = train)
+plot(lda)
+```
+
+We can use this fitted models to see how well they perform on the test dataset: 
+
+```{r}
+preds <- data.frame(true = test$class_new)
+preds$blr_prob <- predict(blr, newdata = test, type = "response")
+
+preds <- preds %>%
+  mutate(blr_pred = ifelse(blr_prob>.5, TRUE, FALSE))
+
+preds$lda_pred <- data.frame(predict(lda, newdata = test))$class
+
+blr_tab <- table(preds$true, preds$blr_pred)
+lda_tab <- table(preds$true, preds$lda_pred)
+
+blr_score <- sum(diag(blr_tab)) / nrow(preds)
+lda_score <- sum(diag(lda_tab)) / nrow(preds)
+print(lda_score)
+print(blr_score)
+```
+
+# Comparing Different $n$ and $N$
+
+We can see that both the LDA and BLR models did quite well in predicting the outcomes of the test dataset. However, to test which does better in certain scenarios the cell below defines a function to compare the score of each when modifying $N$ (the number of observations) and $n$ (the number of randomly chosen observations that have their class switched). Thus, we can see how the models differ with different sample sizes and varying levels of class separation. 
+
+```{r}
+compare_lda_blr <- function(N, n){
+
+  x1 <- rnorm(N, 0, 2)
+  x2 <- rnorm(N, 2, 1)
+  
+  cutoff_x <- seq(-6, 6, length.out = N)
+  m <- -0.2
+  b <- 2
+  cutoff_y <- (m * cutoff_x) + b
+  df <- data.frame(x1 = x1, x2 = x2, cutoff_x = cutoff_x, cutoff_y = cutoff_y)
+
+  df <- df  %>% mutate(
+    class = case_when(
+      x2 < m * x1 + b ~ FALSE,
+      TRUE ~ TRUE
+    )
+  )
+  
+  # randomly change some of the classes
+  df$class_new <- df$class
+  changes <- floor(runif(n, min=0, nrow(df)))
+  for (change in changes) {
+    df$class_new[change] <- !df$class_new[change]
+  }
+
+  train_size = 0.75
+  cutoff = floor(train_size * nrow(df))
+
+  # split data randomly into train and test set
+  tmp_df <- dplyr::select(df, x1, x2, class_new)
+  train_ind <- sample(seq_len(nrow(df)), size=cutoff)
+  train <- tmp_df[train_ind, ]
+  test <- tmp_df[-train_ind, ]
+
+  blr <- glm(class_new ~ x1 + x2, data = train, family = "binomial")
+  lda <- lda(class_new ~ x1 + x2, data = train)
+
+  preds <- data.frame(true = test$class_new)
+  
+  preds$blr_prob <- predict(blr, newdata = test, type = "response")
+  preds <- preds %>%
+    mutate(blr_pred = ifelse(blr_prob>.5, TRUE, FALSE))
+  
+  preds$lda_pred <- data.frame(predict(lda, newdata = test))$class
+  
+  blr_tab <- table(preds$true, preds$blr_pred)
+  lda_tab <- table(preds$true, preds$lda_pred)
+  
+  blr_score <- sum(diag(blr_tab)) / nrow(preds)
+  lda_score <- sum(diag(lda_tab)) / nrow(preds)
+  
+  return(c(n, blr_score, lda_score))
+}
+
+```
+
+The cell below uses this function to show how the accuracy scores using LDA and BLR change when $N=1000$ for different values of $n$.
+
+```{r, warning=FALSE}
+blr_scores <- c()
+lda_scores <- c()
+ns <- seq(1, 500)
+
+for (n in ns){
+  run <- compare_lda_blr(1000, n)
+  blr_scores[n] <- run[2]
+  lda_scores[n] <- run[3]
+}
+
+n_df <- data.frame(blr_scores =  blr_scores, 
+                      lda_scores = lda_scores,
+                      ns = ns)
+```
+
+When plotting the results, we see that there is very little difference in the results of LDA vs BLR. The accuracy of both models decreases with larger $n$ due to less extreme class separation, but there tends to be not deviation between the two at any value of $n$.
+
+```{r, warning=FALSE}
+plt_data <- n_df
+colnames(plt_data) <- c('BLR', 'LDA', 'n')
+plt_data <- melt(plt_data, id.vars = c('n'), 
+                 variable.name = 'Model',
+                 value.name = 'Accuracy')
+ggplot(data=plt_data) +
+  geom_point(aes(x=n, y=Accuracy, color=Model), alpha=0.5) 
+```
+
+Next, the cell below uses the function to show how the accuracy scores change when $n = 0.25 * N$ for different values of $N$:
+
+```{r}
+blr_scores <- c()
+lda_scores <- c()
+start <- 50
+Ns <- seq(start, 500)
+
+for (N in Ns){
+  run <- compare_lda_blr(N, floor(N*0.20))
+  blr_scores[N-start+1] <- run[2]
+  lda_scores[N-start+1] <- run[3]
+}
+
+N_df <- data.frame(blr_scores =  blr_scores, 
+                   lda_scores = lda_scores,
+                   Ns = Ns)
+```
+
+The plotted results provide an interesting result: in general the results for both models get better as the sample size increases, but their dot plot makes a strange repreating curve like structure that I am not able to explain. 
+
+```{r, warning=FALSE}
+plt_data <- N_df
+colnames(plt_data) <- c('BLR', 'LDA', 'N')
+plt_data <- melt(plt_data, id.vars = c('N'), 
+                 variable.name = 'Model',
+                 value.name = 'Accuracy')
+ggplot(data=plt_data) +
+  geom_point(aes(x=N, y=Accuracy, color=Model), alpha=0.5) 
+```
+
+# Thoughts and Conclusions
+
+Based off the reading, I would have assumed LDA to perform better than BLR when the classes were close to being perfectly separated (meaning the likelihood estimates or BLR tend to $\infty$) or when the sample size was low (resulting in BLR overfitting). However, based on the results I am finding no instances in which LDA seems to match this expected behavior. Thus, based purely off these results I would conclude that BLR is always the better choice given that it requires less assumptions than LDA and appears more robust, but it's possible that the case study I am attempting here does not paint the full picture.
+
+The next step I could take in this analysis is to include QDA and include cases in which the hypothetical border between classes is non linear. QDA does not have the same constant covariance condition as LDA, which is why it is able to draw these non-linear decision boundaries. Thus, while LDA and logistic regression might be quicker and more accurate models when faced with classes of constant covariance, QDA should win the day if this is not the case.
+

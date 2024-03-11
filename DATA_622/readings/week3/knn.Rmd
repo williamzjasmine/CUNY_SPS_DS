@@ -1,0 +1,172 @@
+---
+title: "Data 622 - Week 3 - kNN Models"
+author: "William Jasmine"
+date: "2024-02-17"
+output:
+  html_document: default
+  pdf_document: default
+---
+```{r setup, include=FALSE}
+library(tidyverse)
+library(caret)
+library(fastDummies)
+library(data.table)
+library(class)
+```
+
+# Import and View Data
+
+Import [heart disease dataset](https://www.kaggle.com/datasets/johnsmith88/heart-disease-dataset?resource=download):
+
+```{r}
+heart <- read_csv("heart.csv", col_types = "nffnnffnfnfnff")
+glimpse(heart)
+```
+
+Show a summary of the data:
+
+```{r}
+summary(heart)
+```
+
+# Clean and Prep Data
+
+Check for missing data:
+
+```{r}
+which(is.na(heart))
+```
+
+Normalize the data:
+
+```{r}
+# create function that scales data from 0 to 1
+min_max_scaler <- function(x) {
+  # x should be numeric vector
+  return((x - min(x)) / (max(x) - min(x)))
+}
+
+numeric_fields <- colnames(select_if(heart, is.numeric))
+heart <- heart %>%
+  mutate(across(all_of(numeric_fields), min_max_scaler))
+
+# can also use the caret library
+# process <- preProcess(heart, method=c("range"))
+# data <- predict(process, heart)
+
+summary(heart)
+```
+
+Normalization is important while using the KNN model due to the fact that features with a wider range of values can have a disproportionate impact on Euclidean distance calculations (which is the main calculation implemented by the KNN model). The above confirms all numeric fields have a min of 0 and a max of 1.
+
+Next, we create dummy variables for the categorical predictor fields:
+
+```{r}
+categorical_fields <- head(colnames(select_if(heart, is.factor)), -1)
+heart <- dummy_cols(heart, 
+                    select_columns = categorical_fields,
+                    remove_first_dummy = TRUE,
+                    remove_selected_columns = TRUE)
+```
+
+Split the the data into a training and testing set:
+
+```{r}
+# define training data cutoff
+train_size = 0.75
+cutoff = floor(train_size * nrow(heart))
+
+# split data randomly into train and test set
+set.seed(1234)
+train_ind <- sample(seq_len(nrow(heart)), size=cutoff)
+train <- heart[train_ind, ]
+test <- heart[-train_ind, ]
+
+# separate into target and predictors 
+train_x <- select(train, -target)
+train_y <- select(train, target)$target
+test_x <- select(test, -target)
+test_y <- select(test, target)$target
+```
+
+# Make Inital KNN Predictions
+
+Make predictions using the KNN model (without any tuning):
+
+```{r}
+heart_pred_inital <- 
+  knn(
+    train = train_x,
+    test = test_x,
+    cl = train_y,
+    k = 5
+)
+head(heart_pred_inital)
+```
+
+Make a confusion matrix showing how the model performed on the test data:
+
+```{r}
+pred_inital_tab <- table(test_y, heart_pred_inital)
+pred_inital_tab
+```
+
+```{r}
+sum(diag(pred_inital_tab)) / nrow(test_x)
+```
+
+Initial model has an accuracy of ~78% using 5 neighbors. 
+
+# Improve Model
+
+The only available parameter that can be tuned using the KNN model is the number of neighbors $n$. 
+
+Evaluate train and test accuracy using different values of $n$:
+
+```{r}
+# create function to repeatedly run KNN model
+run_knn <- function(train_x, train_y, test_x, test_y, n) {
+  pred <- 
+    knn(
+      train = train_x,
+      test = test_x,
+      cl = train_y,
+      k = n
+  )
+  pred_tab <- table(test_y, pred)
+  return(sum(diag(pred_tab)) / nrow(test_x))
+}
+
+# initialize vectors
+test_accs <- c()
+train_accs <- c()
+ns <- 1:25
+
+# run knn model for different values of n
+for(n in ns){
+  test_accs[n] <- run_knn(train_x, train_y, test_x, test_y, n)
+  train_accs[n] <- run_knn(train_x, train_y, train_x, train_y, n)
+  print(n)
+}
+
+# store in dataframe
+preds_df <- data.frame(ns, test_accs, train_accs)
+head(preds_df)
+```
+
+
+Plot the results:
+
+```{r, warning=FALSE}
+plt_data <- preds_df
+colnames(plt_data) <- c("n", 'Test Set Accuracy', 'Train Set Accuracy')
+plt_data <- melt(plt_data, id.vars = c('n'), 
+                 variable.name = 'Dataset',
+                 value.name = 'Accuracy')
+
+ggplot(data=plt_data) +
+  geom_line(aes(x=n, y=Accuracy, color=Dataset)) 
+
+```
+
+Surprisingly, the best performance from the test set is made using only 1 neighbor. However, this small value of $n$ will likely produce a model that is very prone to the effect of noise or outliers. As such, the second highest value (when $n=7$) is probably a better choice.
