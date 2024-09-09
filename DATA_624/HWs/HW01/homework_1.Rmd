@@ -1,0 +1,373 @@
+---
+title: "Data 624 - HW 1 - Time Series Graphics"
+author: "William Jasmine"
+date: "2024-09-03"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+All exercises can be found in ["Forecasting: Principles and Practice"](https://otexts.com/fpp3/index.html) written by Rob J Hyndman and George Athanasopoulos.
+
+# Setup
+
+The following packages are required to rerun this `.rmd` file:
+
+```{r setup, error=FALSE, warning=FALSE, message=FALSE}
+library(tidyverse)
+library(fpp3)
+library(USgas)
+```
+
+# Exercise 2.1
+
+## Description
+Explore the following four time series: `Bricks` from `aus_production`, `Lynx` from `pelt`, `Close` from `gafa_stock`, `Demand` from `vic_elec`.
+
+ * Use `?` (or `help()`) to find out about the data in each series.
+ * What is the time interval of each series?
+ * Use `autoplot()` to produce a time plot of each series.
+ * For the last plot, modify the axis labels and title.
+
+## Solution
+
+Using the `help()` function, we get the following descriptions of each time series:
+
+```{r}
+help(aus_production)
+```
+
+**Description:** Quarterly estimates of selected indicators of manufacturing production in Australia.
+
+In particular, the `Bricks` column tracks the "clay brick production in millions of bricks."
+
+```{r}
+help(pelt)
+```
+
+**Description:** Hudson Bay Company trading records for Snowshoe Hare and Canadian Lynx furs from 1845 to 1935. This data contains trade records for all areas of the company.
+
+In particular, the `Lynx` column tracks the "The number of Canadian Lynx pelts traded."
+
+
+```{r}
+help(gafa_stock)
+```
+
+**Description:** Historical stock prices from 2014-2018 for Google, Amazon, Facebook and Apple. All prices are in $USD.
+
+In particular, the `Close` column tracks the "closing price for the stock."
+
+
+```{r}
+help(vic_elec)
+```
+
+**Description:** Half-hourly electricity demand for Victoria, Australia.
+
+In particular, the `Demand` column tracks the "Total electricity demand in MWh."
+
+
+The time intervals for each series are as follows.
+
+```{r}
+interval(aus_production)
+```
+
+This represents quarterly time intervals. 
+
+```{r}
+interval(pelt)
+```
+
+This represents yearly time intervals. 
+
+
+```{r}
+interval(vic_elec)
+```
+
+This represents 30 minute time intervals.
+
+```{r}
+interval(gafa_stock)
+```
+
+Interestingly, `gafa_stock` does not appear to have a time interval. Upon closer inspection, this is due to the fact that `gafa_stock` only has rows for days in which the stock market is open: 
+
+```{r}
+head(gafa_stock)
+```
+
+We see in the above output that the weekend of 2014-01-04 and 2014-01-05 was skipped. Thus while the interval of this `tsibble` is technically daily, it skips a decent number of days per year. 
+
+We can use the `autoplot` function to create plots of each time series:
+
+```{r}
+plt_data <- aus_production %>%
+  select(Quarter, Bricks)
+
+autoplot(plt_data, Bricks)
+```
+
+The plot above shows a repeating seasonality trend in Austrailia's yearly brick productions (likely less manufacturing during the summer when workers take off). In addition, after 1980 there appears to be an additional repeating pattern in which brick production drops off dramatically and then slowly crawls back up. 
+
+```{r}
+plt_data <- pelt %>%
+  select(Year, Lynx)
+
+autoplot(plt_data, Lynx)
+```
+
+The graph above shows that there is a definite repeating trend in the number of Lynx pelts traded in Canada during the late late 19th and early 20th centuries. This might be due to a cycle of overhunting of Lynx followed by periods in which hunters wait for their populations to climb via reproduction.
+
+```{r}
+plt_data <- gafa_stock %>%
+  select(Date, Close)
+
+autoplot(plt_data, Close)
+```
+
+The plot above shows a pretty recognizable stock market time series that tracks four major stocks over a period of five years. While there are defintiely flucuations in each stock price, the general trend seems to be that these stocks rise over time. 
+
+```{r}
+plt_data <- vic_elec %>%
+  select(Time, Demand)
+
+autoplot(plt_data, Demand) + labs(
+  x = "Year",
+  y = 'Electricity Demand (MWh)',
+  title = 'Austrailia\'s Energy Demand by Year'
+)
+```
+
+The plot above shows a clear distinction between the power needs of Australians in the summer compared to in the winter, with power demand noticeably higher when it is hot out (likely due to A/C). However, there are also thinner, taller spikes in the coldest months of the winter when demand likely increases again due to the need for heat.  
+
+# Exercise 2.2
+
+## Description
+
+Use `filter()` to find what days corresponded to the peak closing price for each of the four stocks in `gafa_stock`.
+
+## Solution
+
+First, the cell below determines each of the Symbols in the `gafa_stock` dataset: 
+
+```{r}
+symbols <- gafa_stock %>% 
+  distinct(Symbol)
+
+symbols <- symbols$Symbol
+symbols
+```
+
+Next, the cell below determines the date of the maximum closing price for each stock symbol:
+
+```{r}
+# determine the name of the index column 
+index_col_name <- index_var(gafa_stock)
+
+# loop through each symbol
+for(symbol in symbols){
+  # create a tmp tsibble that contains only the rows for a specific symbol
+  tmp <- gafa_stock %>%
+    filter(Symbol == symbol)
+  
+  # determine the max closing price
+  max_val <- max(tmp$Close)
+  
+  # filter the data to get the row that contains the max closing price
+  peak_time <- tmp %>%
+    filter(Close == max_val)
+  
+  # determine the date of the max closing price
+  peak_time <- peak_time[[index_col_name]]
+  
+  # print the output
+  print(paste("On", peak_time, symbol, "hit a max closing price of", max_val))
+}
+```
+
+# Exercise 2.3
+## Description
+
+Download the file [`tute1.csv`](https://bit.ly/fpptute1) from the book website, open it in Excel (or some other spreadsheet application), and review its contents. You should find four columns of information. Columns B through D each contain a quarterly series, labelled `Sales`, `AdBudget` and `GDP`. `Sales` contains the quarterly sales for a small company over the period 1981-2005. `AdBudget` is the advertising budget and `GDP` is the gross domestic product. All series have been adjusted for inflation.
+
+a. Read the data into R.
+b. Convert the data to time series
+c. Construct time series plots of each of the three series
+
+## Solution
+
+The cell below reads in the data from the `csv` file into R:
+
+```{r}
+tute <- readr::read_csv("data/tute1.csv")
+head(tute)
+```
+
+The cell below converts `tute` into a `tsibble` object with `Quarter` as the field index. The `[1Q]` in the output shows that we have converted the data sucessfully: 
+
+```{r}
+tute <- tute %>%
+  # use the Quarter field as the index field
+  mutate(Quarter = yearquarter(Quarter)) %>%
+    as_tsibble(index=Quarter)
+```
+
+Finally, the cell below creates time series plots for each of the three series in the `tsibble`: 
+
+```{r}
+tute %>%
+  # convert data into long format so it can be plotted
+  pivot_longer(-Quarter) %>%
+    # plot the data
+    ggplot(aes(x=Quarter, y=value, color=name)) +
+      geom_line()
+```
+
+The cell below creates the same plot as above, but this time uses a `facet_grid` so that each column has its own plot:
+
+```{r}
+tute %>%
+  # convert data into long format so it can be plotted
+  pivot_longer(-Quarter) %>%
+    # plot the data
+    ggplot(aes(x=Quarter, y=value, color=name)) +
+      geom_line() +
+        facet_grid(name ~ ., scales = "free_y")
+```
+
+# Exercise 2.4
+## Description
+
+The `USgas` package contains data on the demand for natural gas in the US.
+
+a. Create a `tsibble` from `us_total` with `year` as the index and `state` as the key.
+b. Plot the annual natural gas consumption by state for the New England area (comprising the states of Maine, Vermont, New Hampshire, Massachusetts, Connecticut and Rhode Island).
+
+## Solution
+
+The cell below creates a `tsibble` from `us_gas`, showing the natural gas consumption by year for each state in the US.
+
+```{r}
+us_gas <- us_total %>%
+  as_tsibble(index=year,
+             key=state)
+head(us_gas)
+```
+
+The cell below plots the gas consumption for the New England states (Maine, Vermont, New Hampshire, Massachusetts, Connecticut and Rhode Island):
+
+```{r}
+NE_states <- c('Maine', 'Vermont', 'New Hampshire', 'Massachusetts',
+               'Connecticut', 'Rhode Island')
+
+us_gas %>%
+  filter(state %in% NE_states) %>%
+    ggplot(aes(x=year, y=y, color=state)) +
+      geom_line() +
+        labs(title='Natural Gas Consumption in New England',
+             y='Gas Consumption (Cubic Feet x 10^6)',
+             x='Year')
+
+
+```
+
+# Exercise 2.5
+## Description
+
+a. Download [`tourism.xlsx`](https://bit.ly/fpptourism) from the book website and read it into R using `readxl::read_excel()`.
+b. Create a `tsibble` which is identical to the tourism `tsibble` from the `tsibble` package.
+c. Find what combination of Region and Purpose had the maximum number of overnight trips on average.
+d. Create a new `tsibble` which combines the Purposes and Regions, and just has total trips by State.
+
+## Solution 
+
+The cell below reads in the `xlsx` file as a R dataframe:
+
+```{r}
+tourism_xl <- readxl::read_excel('data/tourism.xlsx')
+head(tourism_xl)
+```
+
+Based on the output above, the data appears to show the number of trips taken in each state of Australia. 
+
+The cell below converts the imported `tourism_xl` into a `tsibble`:
+
+```{r}
+tourism_xl_ts <- tourism_xl %>%
+  mutate(Quarter = yearquarter(Quarter)) %>%
+    as_tsibble(index=Quarter, key=c(Region, State, Purpose))
+```
+
+We can now compare `tourism_xl` against the `tourism` `tsibble` from the `ffp3` package to ensure that they are the same: 
+
+```{r}
+all.equal(tourism_xl_ts, tourism)
+```
+
+As we can see from the above, the two `tsibbles` do indeed contain the same information. 
+
+Next, the cell below determines which combination of `Region` and `Purpose` result in the largest average number of trips taken.
+
+```{r, warning=FALSE, message=FALSE}
+tourism_xl %>%
+  # group by the specified columns 
+  group_by(Region, Purpose) %>%
+    # calculate the average number of trips
+    summarise(avg_trips = mean(Trips, na.rm=TRUE)) %>%
+      # order by the average number of trips
+      arrange(desc(avg_trips)) %>%
+        # ungroup so that we can correctly slice data
+        ungroup() %>%
+          # only take the first row, with the highest avg_trips amount
+          slice(1)
+```
+
+Based on the output above, those visiting Sydney represents the largest number of average trips over the time period included in `tourism_xl`.
+
+Finally, the cell below creates a new time series that only shows the number of trips by state (removing Region and Reason).
+
+```{r, message=FALSE}
+tourism_by_state <- tourism_xl %>%
+  # group by specified values
+  group_by(Quarter, State) %>%
+    # calculate total number of trips by quarter for each state
+    summarise(Trips = sum(Trips)) %>%
+      # mutate quarter column to prep for tsibble conversion
+      mutate(Quarter = yearquarter(Quarter)) %>%
+        # convert to tsibble
+        as_tsibble(index=Quarter,
+                   key=State)
+
+head(tourism_by_state)
+```
+
+To confirm this has been done correctly, the cell below spot checks the first row (1998 Q1, ACT):
+
+```{r}
+tmp <- tourism_xl %>% 
+  filter(Quarter == '1998-01-01' & State == 'ACT')
+sum(tmp$Trips)
+```
+
+This value does indeed match the first value seen in `tourism_by_state`. 
+
+
+# Exercise 2.8
+## Description 
+
+Use the following graphics functions: `autoplot()`, `gg_season()`, `gg_subseries()`, `gg_lag()`, `ACF()` and explore features from the following time series: `Employed` from `us_employment`, `Bricks` from `aus_production`, `Hare` from `pelt`, `Cost` from `PBS`, and `Barrels` from `us_gasoline`.
+
+* Can you spot any seasonality, cyclicity and trend?
+* What do you learn about the series?
+* What can you say about the seasonal patterns?
+* Can you identify any unusual years?
+
+## Solution
+
+```{r}
+gg_season(aus_production, y=Bricks,  polar = TRUE)
+
+```
