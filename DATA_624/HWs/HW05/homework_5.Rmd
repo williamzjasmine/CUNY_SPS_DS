@@ -1,0 +1,602 @@
+---
+title: "Data 624 - HW 5 - Exponential Smoothing"
+author: "William Jasmine"
+date: "2024-10-06"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+All exercises can be found in ["Forecasting: Principles and Practice"](https://otexts.com/fpp3/index.html) written by Rob J Hyndman and George Athanasopoulos.
+
+
+# Setup
+
+The following packages are required to rerun this `.rmd` file:
+
+```{r setup, error=FALSE, warning=FALSE, message=FALSE}
+seed_num <- 42
+library(tidyverse)
+library(fpp3)
+```
+
+# Exercise 8.1
+## Description
+
+Consider the the number of pigs slaughtered in Victoria, available in the `aus_livestock` dataset.
+
+a. Use the `ETS()` function to estimate the equivalent model for simple exponential smoothing. Find the optimal values of $\alpha$ and $\ell_0$, and generate forecasts for the next four months. 
+
+b. Compute a 95% prediction interval for the first forecast using $\hat{y}\pm1.96s$ where $s$ is the standard deviation of the residuals. Compare your interval with the interval produced by R.
+
+## Solution
+
+The cell below pulls the relevant data: 
+
+```{r}
+df <- aus_livestock %>%
+  filter(Animal == 'Pigs' & State == 'Victoria')
+```
+
+Plotting `df` shows the number of pigs slaughtered in Victoria, Australia from 1972 to 2018: 
+
+```{r}
+df %>%
+  autoplot(Count) +
+    labs(
+      title = 'Victoria Pig Production'
+    )
+```
+
+The cell below uses the `ETS()` function in conjunction with the data in `df` to produce "ANN" model (otherwise known a simple exponential smoothing model):
+
+```{r}
+fit <- df %>%
+  model(ETS(Count ~ error("A") + trend("N") + season("N")))
+
+report(fit)
+```
+The values of $\alpha$ and $\ell_0$ are reported above. The fitted model (stored as `fit`) can now be used to produce a four month forecast:
+
+```{r}
+fc <- fit %>%
+  forecast(h = "4 months") 
+
+fc %>%
+  autoplot(df)
+```
+
+A 95% confidence interval for the first forecast value can be determined by determining the standard deviation of the residuals, multiplying that value by $\approx$1.96 (the $z-score$ for this level of confidence), and adding/subtracting that value from the forecast. This is done in the cell below:
+
+```{r}
+res_sd <- sd(augment(fit)$.resid)
+
+upper <- round(fc$.mean[1] + (1.96 * res_sd), 2)
+lower <- round(fc$.mean[1] - (1.96 * res_sd), 2)
+
+print_upper <- paste('Upper bound of first forecasted value =', upper)
+print_lower <- paste('Lower bound of first forecasted value =', lower)
+
+cat(print_upper, '\n', print_lower, sep='')
+```
+
+A confidence interval can also be determined using the output of the `fc` made R. The predicted values in `fc` are technically each normal distributions of the form $N(\mu, \sigma^2)$ where \mu is the mean value and $\sigma^2$ is variance. This is shown by extracting the value of the first prediction below:
+
+```{r}
+fc$Count[1]
+```
+
+Taking the square root of the provided variance provides another methodology by which a 95% confidence interval can be calculated:
+
+```{r}
+R_sd <- sqrt(distributional::variance(fc$Count[1]))
+upper <- round(fc$.mean[1] + 1.96 * R_sd, 2)
+lower <- round(fc$.mean[1] - 1.96 * R_sd, 2)
+
+print_upper <- paste('Upper bound of first forecasted value =', upper)
+print_lower <- paste('Lower bound of first forecasted value =', lower)
+
+cat(print_upper, '\n', print_lower, sep='')
+```
+
+The slight difference is due to the fact that R takes into account the degrees of freedom when performing its standard deviation calculation:
+
+$$
+\sigma^R = \sqrt{\frac{\sum(e_i)^2}{n-d}}
+$$
+
+In the above formula, $e_i$ represents the residual values, $n$ is the number of observations, and $d$ is the degrees of freedom. Adjusting the earlier calculation to include $d$ (equal to 2 in this case) shows that the confidence intervals now align:
+
+```{r}
+n = dim(df)[1]
+d = 2
+
+res_sd <- sqrt(sum(augment(fit)$.resid ** 2) / (n-d))
+
+upper <- round(fc$.mean[1] + (1.96 * res_sd), 2)
+lower <- round(fc$.mean[1] - (1.96 * res_sd), 2)
+
+print_upper <- paste('Upper bound of first forecasted value =', upper)
+print_lower <- paste('Lower bound of first forecasted value =', lower)
+
+cat(print_upper, '\n', print_lower, sep='')
+
+```
+
+# Exercise 8.5
+## Description
+
+Data set `global_economy` contains the annual Exports from many countries. Select one country to analyse.
+
+a. Plot the Exports series and discuss the main features of the data.
+
+b. Use an ETS(A,N,N) model to forecast the series, and plot the forecasts.
+
+c. Compute the RMSE values for the training data.
+
+d. Compare the results to those from an ETS(A,A,N) model. (Remember that the trended model is using one more parameter than the simpler model.) Discuss the merits of the two forecasting methods for this data set.
+
+e. Compare the forecasts from both methods. Which do you think is best?
+
+f. Calculate a 95% prediction interval for the first forecast for each model, using the RMSE values and assuming normal errors. Compare your intervals with those produced using R.
+
+# Solution
+
+The relevant data is pulled in the cell below:
+
+```{r}
+df <- global_economy %>%
+  filter(Code == 'USA' & !is.na(Exports))
+```
+
+Plotting the data reveals no apparent seasonality, but an overall upwards trend: 
+
+```{r}
+df %>%
+  autoplot(Exports) + 
+  labs(
+    title = 'USA Exports',
+    y = '% of GDP'
+  )
+```
+
+The cell below creates a five year forecast of the data using a simple exponential smoothing model (ANN). 
+
+```{r}
+fit <- df %>%
+  model(ETS(Exports ~ error("A") + trend("N") + season("N")))
+
+fc <- fit %>%
+  forecast(h = "5 years") 
+
+fc %>%
+  autoplot(df) +
+  labs(
+    title = 'USA Exports: 5 Year Forecast Using ANN',
+    y = '% of GDP'
+  )
+```
+
+The RMSE of the model on the training is shown below: 
+
+```{r}
+rmse <- accuracy(fit)$RMSE
+rmse
+```
+
+Using the same methodology implemented in the previous exercise, the cell below produces a confidence interval of the model's first forecast:
+
+```{r}
+R_sd <- sqrt(distributional::variance(fc$Exports[1]))
+upper <- round(fc$.mean[1] + 1.96 * R_sd, 2)
+lower <- round(fc$.mean[1] - 1.96 * R_sd, 2)
+
+print(paste('95% confidence interval: [', lower, ', ', upper, ']', sep=''))
+```
+
+The RMSE provides yet another way for us to calculate these confidence intervals, given that RMSE is equivalent to the standard deviation of the residuals: 
+
+```{r}
+upper <- round(fc$.mean[1] + 1.96 * rmse, 2)
+lower <- round(fc$.mean[1] - 1.96 * rmse, 2)
+
+print(paste('95% confidence interval: [', lower, ', ', upper, ']', sep=''))
+```
+
+As expected, the two confidence intervals are almost identical. 
+
+The cell produces another 5-year forecast of the data, this time using a AAN model: 
+
+```{r}
+fit <- df %>%
+  model(ETS(Exports ~ error("A") + trend("A") + season("N")))
+
+fc <- fit %>%
+  forecast(h = "5 years") 
+
+fc %>%
+  autoplot(df) +
+  labs(
+    title = 'USA Exports: 5 Year Forecast Using AAN',
+    y = '% of GDP'
+  )
+```
+
+The above plot makes clear that AAN models take trend into account, and produce what is essentially a linear model. 
+
+The same metrics produced for the ANN model can be determined for the AAN model: 
+
+```{r}
+rmse <- accuracy(fit)$RMSE
+rmse
+```
+
+95% confidence interval of the first forecast produced using R: 
+
+```{r}
+R_sd <- sqrt(distributional::variance(fc$Exports[1]))
+upper <- round(fc$.mean[1] + 1.96 * R_sd, 2)
+lower <- round(fc$.mean[1] - 1.96 * R_sd, 2)
+
+print(paste('95% confidence interval: [', lower, ', ', upper, ']', sep=''))
+
+```
+ 
+95% confidence interval of the first forecast produced using the RMSE:
+
+```{r}
+upper <- round(fc$.mean[1] + 1.96 * rmse, 2)
+lower <- round(fc$.mean[1] - 1.96 * rmse, 2)
+
+print(paste('95% confidence interval: [', lower, ', ', upper, ']', sep=''))
+
+```
+
+While the AAN model resulted in only a marginally smaller RMSE and more tightly bound confidence interval, it is clearly the better model in this case. The plot of the data shows a clear upward trend over time that is likely to continue as the U.S. economy grows and attempts to bring back manufacturing within its borders.
+
+# Exercise 8.6
+## Description
+
+Forecast the Chinese GDP from the `global_economy` data set using an ETS model. Experiment with the various options in the `ETS()` function to see how much the forecasts change with damped trend, or with a Box-Cox transformation. Try to develop an intuition of what each is doing to the forecasts.
+
+[Hint: use a relatively large value of h when forecasting, so you can clearly see the differences between the various options when plotting the forecasts.]
+
+# Solution
+
+Fist, the cell below pulls in the relevant data:
+
+```{r}
+df <- global_economy %>%
+  filter(Code == 'CHN' & !is.na(GDP)) %>%
+  # determine value in trillions to make data more readable
+  mutate(GDP = GDP / 1000000000000)
+```
+
+An AAN model (also known as Holt's Linear Trend method) in this case will serve to provide a reasonable benchmark that can used to compare the results of more complex models: 
+
+```{r}
+fit <- df %>%
+  model(ETS(GDP ~ error("A") + trend("A") + season("N")))
+
+fc <- fit %>%
+  forecast(h = "5 years") 
+
+fc %>%
+  autoplot(df) +
+  labs(
+    title = 'China GDP: Forecast Using AAN',
+    y = 'GDP (Trillions of $)'
+  )
+```
+
+There doesn't seem to be much wrong with the correct prediction (it accurately captures the upwards trend), but it is likely the case that China's GDP cannot sustain such high levels of growth far into the future. As such, a damped version of Holt's method may provide a more accurate forecast:
+
+```{r}
+fit <- df %>%
+  model(
+    "\u03A6 = 0.99" = ETS(GDP ~ error("A") +
+                          trend("Ad", phi = 0.99) + season("N")),
+    "\u03A6 = 0.9" = ETS(GDP ~ error("A") +
+                         trend("Ad", phi = 0.9) + season("N")),
+    "\u03A6 = 0.8" = ETS(GDP ~ error("A") +
+                         trend("Ad", phi = 0.8) + season("N")),
+    "\u03A6 = 0.1" = ETS(GDP ~ error("A") +
+                         trend("Ad", phi = 0.1) + season("N"))
+  
+  )
+
+fc <- fit %>%
+  forecast(h = "10 years") 
+
+fc %>%
+  autoplot(df, level=NULL) +
+  labs(
+    title = 'China GDP: Forecast Using Damped Holt\'s Method',
+    y = 'GDP (Trillions of $)'
+  ) +
+  guides(colour=guide_legend(title='Forecast'))
+```
+
+The damped version of the AAN method includes a parameter $\phi$ that gradually reduces (or damps) the growth rate over time. The plot above makes clear that $\phi$=1 is equivalent to using a linear AAN model, while $\phi=0$ is equivalent to using a ANN model. Reasonable values of $\phi$ typically remain within a range of 0.8-0.98, and as the value decreases the level of damping increases. 
+
+A similar comparison can be produced using a version of the data that has undergone a Box-Cox transformation:
+
+```{r}
+# perform the box-cox transformation
+lambda <- df |>
+  features(GDP, features = guerrero) |>
+  pull(lambda_guerrero)
+
+bc_trans <- box_cox(df$GDP, lambda)
+
+df$GDP_BC <- bc_trans
+
+# recreate the previous plot
+fit <- df %>%
+  model(
+    "\u03A6 = 0.99" = ETS(GDP_BC ~ error("A") +
+                          trend("Ad", phi = 0.99) + season("N")),
+    "\u03A6 = 0.9" = ETS(GDP_BC ~ error("A") +
+                         trend("Ad", phi = 0.9) + season("N")),
+    "\u03A6 = 0.8" = ETS(GDP_BC ~ error("A") +
+                         trend("Ad", phi = 0.8) + season("N")),
+    "\u03A6 = 0.1" = ETS(GDP_BC ~ error("A") +
+                         trend("Ad", phi = 0.1) + season("N"))
+  
+  )
+
+fc <- fit %>%
+  forecast(h = "10 years") 
+
+fc %>%
+  autoplot(df, level=NULL) +
+  labs(
+    title = 'China GDP: Damped Holt\'s Method w/ Box-Cox Transform',
+    y = 'GDP (Transformed)'
+  ) +
+  guides(colour=guide_legend(title='\u03A6'))
+
+```
+
+The Box-Cox transformation has smoothed out the exponential behavior of the time series giving it a more linear appearance. This will likely improve upon the results of damped and undamped AAN models, given that that the AANis itself a linear-based model.
+
+# Exercise 8.7
+## Description
+
+Find an ETS model for the Gas data from `aus_production` and forecast the next few years. Why is multiplicative seasonality necessary here? Experiment with making the trend damped. Does it improve the forecasts?
+
+# Solution
+
+The cell below pulls in the relevant data and plots it:
+
+```{r}
+df <- aus_production %>%
+  select(Quarter, Gas)
+
+df %>%
+  autoplot(Gas) +
+  labs(
+    title = 'AUS Gas Production',
+    y = 'Energy (petajoules)'
+  )
+```
+
+The plot above shows a clear example of multiplicative seasonality: the effect of seasonal fluctuations are proportional to the level of the series. Further evidence of this can be seen by comparing the results of a forecast made using an AAA model (relies on additive seasonality) and a MAM model (relies on multiplicative seasonality):
+
+```{r}
+fit <- df |>
+  model(
+    additive = ETS(Gas ~ error("A") + trend("A") + season("A")),
+    multiplicative = ETS(Gas ~ error("M") + trend("A") + season("M"))
+  )
+fc <- fit |> forecast(h = "10 years")
+fc |>
+  autoplot(df, level = NULL) +
+  labs(
+    title="AUS Gas Production: Additive vs. Multiplicative Seasonality",
+    y="Energy (petajoules)"
+  ) +
+  guides(colour = guide_legend(title = "Forecast Type"))
+```
+
+```{r}
+accuracy(fit)$RMSE
+```
+
+The forecast made by the model with multiplicative seasonality clearly matches with the existing data, while the AAA forecast has seasonality fluctuations that are too small. It also produced a smaller RMSE. 
+
+Trend damping can also be incorporated into the MAM model:
+
+```{r}
+fit <- df %>%
+  model(
+    "\u03A6 = 0.9" = ETS(Gas ~ error("M") + trend("Ad", phi = 0.9) +
+                         season("M")),
+    "\u03A6 = 0.8" = ETS(Gas ~ error("M") + trend("Ad", phi = 0.8) +
+                         season("M"))
+  )
+
+fc <- fit %>%
+  forecast(h = "10 years") 
+
+fc %>%
+  autoplot(df, level=NULL) +
+  labs(
+    title="AUS Gas Production: Damped Trend w/ Multiplicative Seasonality",
+    y="Energy (petajoules)"
+  ) +
+  guides(colour=guide_legend(title='\u03A6'))
+```
+
+```{r}
+accuracy(fit)$RMSE
+```
+
+This damping can be useful if it is expected that growth rates will not be sustainable over time. Though the damped models did produce slightly smaller RMSE values compared to their undamped counterpart, it is not fully clear if this necessarily improves the forecast. This determination likely requires consideration of outside economic/geopolitical factors.
+
+# Exercise 8.8 
+## Description
+Recall your retail time series data (from [Exercise 7 in Section 2.10](https://otexts.com/fpp3/graphics-exercises.html#graphics-exercises)).
+
+a. Why is multiplicative seasonality necessary for this series?
+
+b. Apply Holt-Winters’ multiplicative method to the data. Experiment with making the trend damped.
+
+c. Compare the RMSE of the one-step forecasts from the two methods. Which do you prefer?
+
+d. Check that the residuals from the best method look like white noise.
+
+e. Now find the test set RMSE, while training the model to the end of 2010. Can you beat the seasonal naïve approach from [Exercise 7 in Section 5.11](https://otexts.com/fpp3/toolbox-exercises.html#toolbox-exercises)?
+
+# Solution
+
+The cell below pulls in the relevant data: 
+
+```{r}
+set.seed(seed_num)
+df <- aus_retail %>%
+  filter(`Series ID` == sample(aus_retail$`Series ID`,1)) %>%
+    # transform to be indexed by quarter instead - less noisy
+    mutate(Quarter = yearquarter(Month)) %>%
+      index_by(Quarter) %>% 
+        summarise(Turnover = sum(Turnover)) %>%
+          select(Quarter, Turnover)
+```
+
+A plot of `df` is shown below:
+
+```{r}
+df %>%
+  autoplot(Turnover) +
+  labs(
+    title = 'AUS Retail Turnover',
+    y = 'Millions of $ (AUD)'
+  )
+```
+
+Once again, multiplicative seasonality is necessary to accurately model the data in this case as the effect of the seasonal fluctuations are proportional to the level of the series.
+
+As such, the cell below uses a damped ($\phi = 1$) and an undamped ($\phi = 0.98$) MAM model in an attempt to forecast the time series: 
+
+```{r}
+fit <- df %>%
+  model(
+    "\u03A6 = 0.98" = ETS(Turnover ~ error("M") + trend("Ad", phi = 0.98) +
+                         season("M")),
+    "\u03A6 = 1.0" = ETS(Turnover ~ error("M") + trend("A") +
+                         season("M"))
+  )
+
+fc <- fit %>%
+  forecast(h = "10 years") 
+
+fc %>%
+  autoplot(df, level=NULL) +
+  labs(
+    title="AUS Retail Turnover: Damped Trend w/ Multiplicative Seasonality",
+    y='Millions of $ (AUD)'
+  ) +
+  guides(colour=guide_legend(title='\u03A6'))
+```
+
+The RMSE of each model is shown below:
+
+```{r}
+accuracy(fit) %>%
+  select(.model, .type, RMSE)
+```
+
+While the damped model does technically have a slightly smaller RMSE value, it does not appear to match the overall upward trend of the time series and appears suspiciously flat despite $\phi$ being so close to 1. As such, the undamped model was chosen as the preferred methodology in this case. 
+
+The residuals of the undamped model appear to have no apparent trend, and, despite there being a few outliers, they are almost all within the bounds of the ACF plot. 
+
+```{r}
+fit <- fit[2]
+fit %>%
+  gg_tsresiduals()
+```
+
+Given that the model passes its residual diagnostics tests, it can be used to make predictions on some test data (in this case, those observations occurring after 2010): 
+
+```{r, message=False}
+df_train <- df %>%
+  filter(year(Quarter) <= 2010)
+df_test <- anti_join(df, df_train)
+
+fit <- df_train %>%
+  model(ETS(Turnover ~ error("M") + trend('A') + season("M")))
+
+fc <- fit |>
+  forecast(new_data = df_test)
+
+fc |> autoplot(df) +
+  labs(
+    title="AUS Retail Turnover: Test Set Predictions",
+    y='Millions of $ (AUD)'
+  ) 
+```
+
+The above plot shows predicted values that align quite closely with the actual observations and result in the following error metrics: 
+
+```{r}
+accuracy(fc, data = df_test) %>%
+  select(RMSE, MAPE)
+```
+
+Comparing the results of the predictions above to the `SNAIVE` model used in [Exercise 7 in Section 5.11](https://otexts.com/fpp3/toolbox-exercises.html#toolbox-exercises) shows a clear improvement: 
+
+```{r}
+# build SNAIVE model
+fit <- df_train |>
+  model(SNAIVE(Turnover))
+
+fc <- fit |>
+  forecast(new_data = df_test)
+
+accuracy(fc, data = df_test) %>%
+  select(RMSE, MAPE)
+```
+
+
+# Exercise 8.9
+## Description
+
+For the same retail data, try an STL decomposition applied to the Box-Cox transformed series, followed by ETS on the seasonally adjusted data. How does that compare with your best previous forecasts on the test set?
+
+# Solution
+
+The cell below repeats the process of predictions made in the previous exercise, but this time first applies both a Box-Cox transformation and STL composition to the data. 
+
+```{r, message=FALSE}
+# perform Box-Cox transformation
+lambda <- df |>
+  features(Turnover, features = guerrero) |>
+  pull(lambda_guerrero)
+
+df$Turnover_BC <- box_cox(df$Turnover, lambda)
+
+# perform STL decomposition
+df_stl <- df %>%
+  model(STL(Turnover_BC ~ season(window = "periodic")))
+
+components <- components(df_stl)
+df$Turnover_BC_STL <- components$trend + components$season_adjust
+
+df_train <- df %>%
+  filter(year(Quarter) <= 2010)
+df_test <- anti_join(df, df_train)
+
+# split data into testing and training sets
+fit <- df_train %>%
+  model(ETS(Turnover_BC_STL ~ error("M") + trend('A') + season("M")))
+
+# make forecast
+fc <- fit %>%
+  forecast(new_data = df_test)
+
+# output accuracy scores
+accuracy(fc, data = df_test) %>%
+  select(RMSE, MAPE)
+```
+
+Since the data has been transformed, RMSE is no longer a reliable metric for comparing results. However, the mean absolute percentage error (MAPE) is lower than when the model was applied to untransformed, non-decomposed data. This supports the conclusion that combining these methodologies leads to better overall performance.
