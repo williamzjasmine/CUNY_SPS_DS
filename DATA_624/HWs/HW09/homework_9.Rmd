@@ -1,0 +1,525 @@
+---
+title: "Data 624 - HW 9 - Tree Based Models"
+author: "William Jasmine"
+date: "2024-11-17"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+All exercises can be found in ["Applied Predictive Modelling"](http://appliedpredictivemodeling.com/) written by Max Kuhn and Kjell Johnson.
+
+# Setup
+
+The following packages are required to rerun this `.rmd` file:
+
+```{r setup, error=FALSE, warning=FALSE, message=FALSE}
+seed_num <- 200
+library(tidyverse)
+library(mlbench)
+library(randomForest)
+library(caret)
+library(party)
+library(Cubist)
+library(gbm)
+library(rpart)
+library(AppliedPredictiveModeling)
+```
+
+# Exercise 8.1
+
+Recreate the simulated data from exercise 7.2:
+
+```{r}
+set.seed(seed_num)
+simulated <- mlbench.friedman1(200, sd = 1)
+simulated <- cbind(simulated$x, simulated$y)
+simulated <- as.data.frame(simulated)
+colnames(simulated)[ncol(simulated)] <- "y"
+```
+
+## Part (a)
+### Description
+
+Fit a random forest model to all of the predictors, and then estimate the variable importance scores. Did the random forest significantly use the uninformative predictors (`V6`-`V10`)?
+
+### Solution
+
+The code below builds the random forest model and estimates their feature importance:
+
+```{r}
+rf <- randomForest(y ~ ., data = simulated, importance = TRUE, ntree = 1000)
+rf_imp <- varImp(rf, scale = FALSE)
+rf_imp
+```
+
+The feature importances are plotted below so they can be compared visually:
+
+```{r}
+rf_imp$Variable <- rownames(rf_imp)
+
+ggplot(rf_imp, aes(x = reorder(Variable, -Overall), y = Overall)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +  # Flip axes for better readability
+  labs(
+    title = "Variable Importance",
+    x = "Variables",
+    y = "Importance Score"
+  ) +
+  theme_minimal()
+```
+
+The plot above makes it clear that variables V6-V10 were not significantly used by the `rf` random forest model.
+
+## Part (b)
+### Description
+
+Now add an additional predictor that is highly correlated with the `V1` predictor. Fit another random forest model to these data. Did the importance score for `V1` change? What happens when you add another predictor that is highly correlated with `V1`?
+
+### Solution 
+
+The cell below adds another variable `duplicated1` to `simulated` that is highly correlated with `V1`.
+
+```{r}
+simulated$duplicate1 <- simulated$V1 + rnorm(dim(simulated)[1]) * 0.1
+cor(simulated$duplicate1, simulated$V1)
+```
+
+The `cor()` output above makes this correlation clear. We can now recalculate and plot the feature importances using a new random forest model. 
+
+```{r}
+rf <- randomForest(y ~ ., data = simulated, importance = TRUE, ntree = 1000)
+rf_imp <- varImp(rf, scale = FALSE)
+rf_imp$Variable <- rownames(rf_imp)
+
+ggplot(rf_imp, aes(x = reorder(Variable, -Overall), y = Overall)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +  # Flip axes for better readability
+  labs(
+    title = "Variable Importance",
+    x = "Variables",
+    y = "Importance Score"
+  ) +
+  theme_minimal()
+```
+
+We see now that the feature importance of `V1` has decreased by a significant amount compared to the random forest model created in part (a). This is due to the fact that some of the information the model used from `V1` is now coming from `simulated1`, given that these two variables are highly correlated. In fact, the sum of the feature importances for `V1` and `simulated1` are close to the original feature importance of `V1` in the previous model. 
+
+## Part (c)
+### Description 
+
+Use the `cforest` function in the `party` package to fit a random forest model using conditional inference trees. The `party` package function `varImp` can calculate predictor importance. The `conditional` argument of that function toggles between the traditional importance measure and the modified version described in Strobl et al. (2007). Do these importances show the same pattern as the traditional random forest model?
+
+### Solution
+
+The cell below produces the relevant random forest models and stores all of their respective feature importances in a dataframe `rf_imp`. 
+
+```{r}
+# remove the correlated variable
+simulated <- simulated %>%
+  select(-duplicate1)
+
+# get variable importances for all models
+rf <- randomForest(y ~ ., data = simulated, importance = TRUE, ntree = 1000)
+rf_imp <- varImp(rf, scale = FALSE)
+
+crf <- cforest(y ~ ., data = simulated, 
+              controls = cforest_unbiased(ntree = 1000))
+tmp1 <- varimp(crf, conditional = T) 
+tmp2 <- varimp(crf, conditional = F)
+
+rf_imp <- cbind(rf_imp, tmp1, tmp2)
+```
+
+The cell below plots the data from `rf_imp`:
+
+```{r}
+colnames(rf_imp) <- c('Traditional', 'Conditional=T', 'Conditional=F')
+rf_imp$Variable <- rownames(rf_imp)
+plt_data <- gather(rf_imp,"condition","value",-Variable)
+
+ggplot(plt_data,aes(x=Variable,y=value, fill = condition,color=condition))+
+  geom_bar(stat="identity",position="dodge")+
+  ggtitle("Variable Importance by Model")
+
+```
+
+The feature importances vary slightly when comparing the importances from different model types, but the general trend stays the same with variables `V1`-`V5` being important to the model while variables `V6`-`V10` remain insignificant. 
+
+## Part (d)
+### Description
+
+Repeat this process with different tree models, such as boosted trees and cubist. Does the same pattern emerge?
+
+### Solution 
+
+The cell below creates new feature importances from gradient boosted tree and cubist models and adds them to the `rf_imp` dataframe created in part (d).
+
+```{r, results='hide', message=FALSE, warning=FALSE, results='hide'}
+gbm_mod <- gbm(y ~ ., data=simulated, distribution='gaussian')
+cubist_mod <- cubist(x=select(simulated, -y), simulated$y)
+
+cubist_var_imp <- varImp(cubist_mod)
+gbm_var_imp <- summary(gbm_mod)[2]
+
+rf_imp <- merge(cbind(rf_imp, cubist_var_imp), 
+                gbm_var_imp, by="row.names", all=TRUE)
+
+rf_imp <- select(rf_imp,, -Row.names)
+colnames(rf_imp) <-  c('Traditional', 'Conditional=T', 'Conditional=F', 
+                       'Variable', 'Gradient Boosted Trees', 'Cubist')
+```
+
+The importances are plotted below one last time:
+
+```{r}
+plt_data <- gather(rf_imp,"condition","value",-Variable)
+
+ggplot(plt_data,aes(x=Variable,y=value, fill = condition,color=condition))+
+  geom_bar(stat="identity",position="dodge")+
+  ggtitle("Variable Importance by Model")
+
+```
+
+The different models still all categorize `V1-V5` as the significant variables, but the cubist and gradient boosted models significantly raise the importance of the most important features (`V1-V4`). This makes sense seeing as these two models boost the contribution of the most significant predictors. 
+
+# Exercise 8.2
+## Description
+
+Use a simulation to show tree bias with different granularities.
+
+## Solution
+
+First, the cell below creates a dataset that can be used for the simulation. It consists of producing 1,000 samples of three feature variables each with differing levels of granularity (2, 5, and 10 levels). A target variable is also produced that is a linear combination of the three terms, plus an error term.
+
+```{r}
+set.seed(seed_num)
+
+n <- 1000
+low_granularity <- sample(1:2, n, replace = TRUE)  # 2 levels
+medium_granularity <- sample(1:5, n, replace = TRUE)  # 5 levels
+high_granularity <- sample(1:10, n, replace = TRUE)  # 10 levels
+
+target <- low_granularity + medium_granularity + high_granularity + rnorm(n)
+
+sim_data <- data.frame(low_granularity, medium_granularity, high_granularity, target)
+```
+
+Next, we can use this data in `sim` to produce a decision tree and determine the feature importances:
+
+```{r}
+# produce model
+dt_mod <- rpart(target ~ ., data = sim_data)
+
+# pull feature importances
+imp <- as.data.frame(varImp(dt_mod))
+colnames(imp) <- c("Importance")
+imp$Variable <- rownames(imp)
+```
+
+The results are plotted below:
+
+```{r}
+ggplot(imp, aes(x = reorder(Variable, Importance), y = Importance)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  labs(
+    title = "Feature Importance by Granularity",
+    y = "Importance",
+    x = ''
+  ) +
+  theme_minimal()
+```
+
+It is clear in the above plot that the variable with the highest granularity (10 possible values in this case), was considered much more important to training the decision tree compared to the medium and low granularity variables. This kind of bias is only one of the possible types that data practitioners need to be cognizant of when building tree-based models. 
+
+# Exercise 8.3 
+## Description
+
+In stochastic gradient boosting the bagging fraction and learning rate will govern the construction of the trees as they are guided by the gradient. Although the optimal values of these parameters should be obtained through the tuning process, it is helpful to understand how the magnitudes of these parameters affect magnitudes of variable importance. Figure 8.24 provides the variable importance plots for boosting using two extreme values for the bagging fraction (0.1 and 0.9) and the learning rate (0.1 and 0.9) for the solubility data. The left-hand plot has both parameters set to 0.1, and the right-hand plot has both set to 0.9. 
+
+## Part (a)
+### Description
+
+Why does the model on the right focus on its importance on just the first few of predictors, whereas the model on the left spreads importance across more predictors. 
+
+### Solution 
+
+Gradient boosted tree models with a high learning rate and bagging fraction tend to be more "aggressive" in that they very quickly search for and focus on what it deems are the best predictors. The high bagging fraction means that most of the data is being used for training in each boosting iteration, resulting in the identified splits tending to favor the strongest predictors. The high learning rate also typically results in fewer overall boosting iterations, giving the model less of a chance to "explore" the possibly less important features. Exactly the opposite is true when using a model with a low learning rate and bagging fraction. The combination of using less data in each iteration combined with freedom for the model to explore other features means that the importance values are more spread out across the entire range of features. 
+
+## Part (b)
+### Description 
+
+Which model do you think would be more predictive of other samples?
+
+### Solution
+
+If new samples are generated that are similar to the initial sample used to train the models, then the model on the right (with the high bagging fraction and learning rate) would likely be most effective. It will focus on the most important predictors, and should produce accurate results quickly. However, this model is also likely to perform poorly should future samples contain any changes or outliers that are evidence of true underlying patterns that could affect predictions. The model on the left (with low learning rate and bagging fraction) would likely be better at adapting to new data and picking out these less noticeable patterns to boost its predictive power. As such, choosing between the two really depends on use case and the role the model is attempting to fill.
+
+## Part (c)
+### Description
+
+How would increasing interaction depth affect the slope of predictor importance for either model in Fig. 8.24.
+
+### Solution
+
+To better understand how interaction depth affects the predictor importance for the two types of `gbm` models, the cell below runs a simulation. 
+
+```{r}
+
+set.seed(seed_num)
+p <- 10  # number of predictors
+
+# create predictors V1-V10 (all normally distributed)
+X <- as.data.frame(matrix(rnorm(n * p), nrow = n, ncol = p))
+colnames(X) <- paste0("V", 1:p)
+
+# pick V1, V2, and V3 as predictors
+X$y <- 5 * X$V1 + 3 * X$V2 - 2 * X$V3 * rnorm(n) 
+
+depths <- c(1, 5, 10)
+results <- data.frame()
+# run simulation for gbm models of different depths
+for (depth in depths) {
+  # train model (right-hand side, high learning rate and bagging fraction)
+  high_lr <- gbm(y ~ ., data = X, distribution = "gaussian",
+                 interaction.depth = depth, 
+                 shrinkage = 0.9, 
+                 bag.fraction = 0.9
+                 )
+  # train model (left-hand side, low leanring rate and bagging fraction)
+  low_lr <- gbm(y ~ ., data = X, distribution = "gaussian",
+                interaction.depth = depth, 
+                shrinkage = 0.1, 
+                bag.fraction = 0.1
+  )
+  
+  high_importance <- summary(high_lr, plotit = FALSE)
+  low_importance <- summary(low_lr, plotit = FALSE)
+  
+  # store everything in the dataframe
+  results <- rbind(
+    results,
+    data.frame(
+      Variable = high_importance$var,
+      Importance = high_importance$rel.inf,
+      Depth = depth,
+      Model = "High LR & Bagging"
+    ),
+    data.frame(
+      Variable = low_importance$var,
+      Importance = low_importance$rel.inf,
+      Depth = depth,
+      Model = "Low LR & Bagging"
+    )
+  )
+}
+```
+
+The simulation created 10 predictor variables and a target variable that was a linear combination of the first three plus a small error term. This data was then used to produce `gbm` models with large and small learning rate/bagging fraction values at different interaction depths. The results of the simulation are shown below:
+
+```{r}
+ggplot(results, aes(x = Variable, y = Importance, fill = Model)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  facet_wrap(~Depth, scales = "free_y", ncol = 1) +
+  labs(
+    title = "Feature Importance by Interaction Depth",
+    x = "Predictor",
+    y = "Relative Importance"
+  ) +
+  theme_minimal()
+
+```
+
+The plot shows that both types of models end up spreading their importance across additional features as the interaction depth increases. However, this effect does appear more pronounced for the models with low learning rate and bagging fraction. The conclusion drawn from this is that added interaction depth gives any type of `gbm` model a chance to further explore additional features and spread out importance across a larger range. 
+
+# Exercise 8.4 
+## Description
+
+Use a single predictor in the solubility data, such as the molecular weight of the number of carbon atoms and fit several models:
+
+(a) A simple regression tree
+(b) A random forest model
+(c) Different cubist models with a single rule of multiple committees (each with and without using neighbor adjustments)
+
+Plot the predictor data versus the solubility results for the test set. Overlay the model predictions for the test set. How do the model differ? Does changing the tuning parameters significant affect the model fit?
+
+## Solution
+
+First, the cell below produces the data and splits them into training and testing sets. 
+
+```{r}
+data(solubility)
+
+X_train <- select(solTrainX, MolWeight)
+X_test <- select(solTestX, MolWeight)
+
+y_train <- solTrainY
+y_test <- solTestY
+
+train <- cbind(X_train, y_train)
+colnames(train) <- c('MolWeight', 'y')
+test <- cbind(X_test, y_test)
+colnames(test) <- c('MolWeight', 'y')
+```
+
+First, two decision trees are created (tuned and untuned) to make predictions on the solubility data:
+
+```{r}
+train_control <- trainControl(method = "cv", number=5)
+tune_grid <- expand.grid(
+  maxdepth = 1:10
+)
+
+tree_untuned <- rpart(y ~ ., data=train)
+tree_untuned_preds <- predict(tree_untuned, newdata = X_test, type="vector")
+tree_untuned_r2 <- R2(tree_untuned_preds, y_test)
+
+tree_tuned <- train(
+  y ~ ., data = train, method = 'rpart2',
+  trControl = train_control,
+  tuneGrid = tune_grid 
+)
+tree_tuned_preds <- predict(tree_tuned, newdata = X_test, type="raw")
+tree_tuned_r2 <- R2(tree_tuned_preds, y_test)
+
+```
+
+Next, predictions are made using a tuned and an untuned random forest:
+
+```{r}
+tune_grid <- expand.grid(
+  mtry = 1
+)
+
+rf_untuned <- randomForest(y ~ ., data=train)
+rf_untuned_preds <- predict(rf_untuned, newdata = X_test, type="response")
+rf_untuned_r2 <- R2(rf_untuned_preds, y_test)
+
+
+rf_tuned <- train(y ~ ., data = train, method = 'rf',
+  trControl = train_control,
+  tuneGrid = tune_grid 
+)
+rf_tuned_preds <- predict(rf_tuned, newdata = X_test)
+rf_tuned_r2 <- R2(rf_tuned_preds, y_test)
+```
+
+Lastly, predictions are made using four different cubist models, two of each using a single rule and multiple committees with and without neighbor adjustments. 
+
+```{r}
+# single rule, no neighbors
+tune_grid <- expand.grid(
+  committees = 1,
+  neighbors = 0
+)
+
+cub_sing_nn <- train(X_train, y_train,
+                     method = 'cubist',
+                     metric = 'Rsquared',
+                     tuneGrid = tune_grid
+)
+cub_sing_nn_preds <- predict(cub_sing_nn, newdata = X_test)
+cub_sing_nn_r2 <- R2(cub_sing_nn_preds, y_test)
+
+
+# single rule, with neighbors (tuned)
+tune_grid <- expand.grid(
+  committees = 1,
+  neighbors = 1:5
+)
+
+cub_sing_wn <- train(X_train, y_train,
+                     method = 'cubist',
+                     metric = 'Rsquared',
+                     tuneGrid = tune_grid
+)
+cub_sing_wn_preds <- predict(cub_sing_wn, newdata = X_test)
+cub_sing_wn_r2 <- R2(cub_sing_wn_preds, y_test)
+
+
+# multiple committees, no neighbors 
+tune_grid <- expand.grid(
+  committees = 10,
+  neighbors = 0
+)
+
+cub_mult_nn <- train(X_train, y_train,
+                     method = 'cubist',
+                     metric = 'Rsquared',
+                     tuneGrid = tune_grid
+)
+cub_mult_nn_preds <- predict(cub_mult_nn, newdata = X_test)
+cub_mult_nn_r2 <- R2(cub_mult_nn_preds, y_test)
+
+# multiple committees, with neighbors (tuned)
+tune_grid <- expand.grid(
+  committees = 10,
+  neighbors = 1:5
+)
+
+cub_mult_wn <- train(X_train, y_train,
+                     method = 'cubist',
+                     metric = 'Rsquared',
+                     tuneGrid = tune_grid
+)
+cub_mult_wn_preds <- predict(cub_mult_wn, newdata = X_test)
+cub_mult_wn_r2 <- R2(cub_mult_wn_preds, y_test)
+```
+
+The cell below combines all the calculated predictions and their associated $R^2$ values. 
+
+```{r}
+preds <- data.frame(tree_untuned_preds,
+                    tree_tuned_preds,
+                    rf_untuned_preds,
+                    rf_tuned_preds,
+                    cub_sing_nn_preds,
+                    cub_sing_wn_preds,
+                    cub_mult_nn_preds,
+                    cub_mult_wn_preds)
+
+model_names <- c('Decision Tree',
+                 'Decision Tree (Tuned)',
+                  'Random Forest', 
+                  'Random Forest (Tuned)',
+                  'Cubist: Single Rule, No Neighbors',
+                  'Cubist: Single Rule, w/ Neighbors',
+                  'Cubist: Multiple Committees, No Neighbors',
+                  'Cubist: Multiple Committees, w/ Neighbors')
+
+colnames(preds) <- model_names
+
+r2_scores <- c(tree_untuned_r2,
+               tree_tuned_r2,
+               rf_untuned_r2,
+               rf_tuned_r2,
+               cub_sing_nn_r2,
+               cub_sing_wn_r2,
+               cub_mult_nn_r2,
+               cub_mult_wn_r2)
+
+r2_scores <- data.frame(r2_scores, model_names)
+colnames(r2_scores) <- c('R^2', 'Model Type')
+```
+
+The $R^2$ scores for each model are shown in the table below:
+
+```{r}
+r2_scores[order(r2_scores$`R^2`),]
+```
+
+Lastly, the predictions for each model are shown below:
+
+```{r}
+plt_data <- cbind(preds, y_test, X_test)
+plt_data <- plt_data %>%
+  pivot_longer(cols = -c("MolWeight"), names_to = "variable", values_to = "value")
+
+ggplot(plt_data, aes(x = MolWeight, y = value, color = variable)) +
+  geom_point(alpha=0.5, size=0.6) +
+  labs(title = "Tree Models w/ Single Predictor", x = "MolWeight", y = "Solubility") +
+  theme_minimal()
+```
+
+Based off the plots and chart above, we see that the random forest model performed the best. The rest of the models all performed relatively similarly, which is surprising given the level of complexity achieved by the cubist models compared to single decision trees. However, given that these models were built using a single predictor it is possible these more complex models were not really given an opportunity to add significant benefit. The single predictor also means that many of the tuning parameters were not able to be modified, which is evidenced by the fact that the tuned version of the random forest and decision tree models do not perform much better than their untuned counterparts. 
