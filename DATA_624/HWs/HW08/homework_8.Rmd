@@ -1,0 +1,401 @@
+---
+title: "Data 624 - HW 8 - Non-Linear Regression"
+author: "William Jasmine"
+date: "2024-11-10"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+All exercises can be found in ["Applied Predictive Modelling"](http://appliedpredictivemodeling.com/) written by Max Kuhn and Kjell Johnson.
+
+# Setup
+
+The following packages are required to rerun this `.rmd` file:
+
+```{r setup, error=FALSE, warning=FALSE, message=FALSE}
+seed_num <- 200
+library(tidyverse)
+library(AppliedPredictiveModeling)
+library(mlbench)
+library(caret)
+library(doParallel)
+library(kernlab)
+library(earth)
+```
+
+The cell below sets up a parallel backend to speed up the process of training the models used in this assignment.
+
+```{r}
+# Detect the number of available cores
+cores <- parallel::detectCores()
+
+# Create a cluster
+cl <- makeCluster(cores - 1) # Use one less core to avoid overloading
+
+# Register the cluster for parallel processing
+registerDoParallel(cl)
+```
+
+
+# Exercise 7.2
+## Description 
+
+Friedman (1991) introduced several benchmark data sets created by simulation. One fo these simulations used the following nonlinear equation to create data:
+
+$$
+y = 10\sin{\pi x_1x_2} + 20(x_3-0.5)^2 + 10x_4 + 5x_5 + N(0, \sigma^2)
+$$
+
+where the $x$ values are random variables uniformly distributed between [0,1] (there are also 5 other non-informative variables also created in the simulation). The package `mlbench` contains a function called `mlbench.friedman1` that simulates these data:
+
+```{r}
+set.seed(seed_num)
+trainingData <- mlbench.friedman1(200, sd = 1)
+## We convert the 'x' data from a matrix to a data frame
+## One reason is that this will give the columns names.
+trainingData$x <- data.frame(trainingData$x)
+## Look at the data using 
+featurePlot(trainingData$x, trainingData$y)
+## or other methods
+
+## This creates a list with a vector 'y' and a matrix
+## of predictors 'x'. Also simulate a very large test set to
+## estimate the true error rate with good precision:
+testData <- mlbench.friedman1(5000, sd = 1)
+testData$x <- data.frame(testData$x)
+```
+
+Tune several models on this data. For example:
+
+```{r}
+knnModel <- train(x = trainingData$x,
+                  y = trainingData$y,
+                  method = 'knn',
+                  preProc = c("center", "scale"),
+                  tuneLength = 10)
+knnModel
+```
+
+```{r}
+knnPred <- predict(knnModel, newdata = testData$x)
+## The function 'postResample' can be used to get the test set
+## performance values
+postResample(pred = knnPred, obs = testData$y)
+```
+
+Which models appear to give the best performance? Does MARS select the informative predictors (those named `X1`-`X5`)?
+
+## Solution
+
+Since the description of the exercise already implemented and tested a K-Nearest-Neighbors (KNN) model, we can use its performance as a benchmark to evaluate some of the more complicated non-linear regression models. First the cell below tunes a neural network by comparing models with different hidden layer sizes and decay rates: 
+
+```{r}
+set.seed(seed_num)
+
+train_control <- trainControl(method = "cv", number=5, allowParallel = TRUE)
+nnet_grid <- expand.grid(.decay = c(0, 0.01, 0.1), # learning rate
+                         .size = c(1:10), # size of hidden layer
+                         .bag = FALSE)
+
+nnet <- train(trainingData$x, trainingData$y,
+              method = 'avNNet',
+              tuneGrid = nnet_grid,
+              trControl = train_control,
+              preProc = c("center", "scale"),
+              linout = TRUE,
+              trace = FALSE,
+              MaxNWts = 10 * (ncol(trainingData$x) + 1) + 10 + 1,
+              max_it = 500)
+
+# Info on setting MaxNWts: The MaxNWts argument is used to specify the maximum # allowable number of weights in the neural network model. 
+
+# MaxNWts = 10 * (ncol(trainingData$x) + 1) + 10 + 1
+# 10: Represents max number of hidden units from tuning grid
+# ncol(trainingData$x): The number of input features.
+# +1: Accounts for the bias term in the input layer.
+# +10: The connections between the hidden layer and the output layer.
+
+nnet
+```
+
+The summary above reveals that the a neural network with 5 nodes in its hidden layer and a decay rate of 0.1 achieved the top performance. The cell below also provides a plot of data seen in the summary, showing visually that this model oversaw the lowest error score:
+
+```{r}
+plot(nnet)
+```
+
+The cell below uses the tuned neural network to and evaluates its performance on the test set: 
+
+```{r}
+nnetPred <- predict(nnet, newdata = testData$x)
+postResample(pred = nnetPred, obs = testData$y)
+```
+
+The process outlined above using neural networks is repeated below using Support Vector Machine (SVM) regression models. Implementing SVM requires the choice of a kernel to map features into higher dimensional space, and choice of kernel affects the parameters that can be tuned. In this case, we use a radial basis function kernel and evaluate models with different values of $C$ and $\sigma$:
+
+```{r}
+set.seed(seed_num)
+
+svm_grid <- expand.grid(
+  sigma = c(0.01, 0.1, 1),    # radial kernel parameter
+  C = c(0.1, 1, 10)           # cost parameter
+)
+
+svm <- train(trainingData$x, trainingData$y,
+             method = 'svmRadial',
+             preProc = c("center", "scale"),
+             tuneGrid = svm_grid,
+             trControl = train_control)
+
+svm
+```
+
+```{r}
+plot(svm)
+```
+
+In this case, the best model SVM model had a $C$ (cost) value of 10 and a $\sigma$ value of 0.1. Using the model on the test set results in the following performance:
+
+```{r}
+svmPred <- predict(svm, newdata = testData$x)
+postResample(pred = svmPred, obs = testData$y)
+```
+
+The tuned versions of the neural network and SVM models achieved $R^2$ values of $\approx$ 0.81 using the test data. As such, these models exhibit a considerable improvement when compared to the performance of the tuned KNN model created in the exercise description. This is reassuring, given that these models (especially the neural network) are more mathematically (and by extension, more computationally) complex compared to the KNN model. That being said, KNN can still offer reasonable predictions quickly and acts as a strong benchmark to evaluate these more complex models. 
+
+Lastly, the cell below fits a Multivariate Adaptive Regression Splines (MARS) model. While MARS models can be used to make predictions, they are also useful in that they can identify what they believe are the most informative predictors. This latter ability is what is tested below:  
+
+```{r}
+mars <- earth(trainingData$x, trainingData$y)
+mars
+```
+
+MARS models will only use what it believes are the most important predictors, which, according to the output above, are predictors `X1`-`X6`. Based on the formula used to simulate the data, only `X1`-`X5` are relevant, and while `X6` technically will be used by this MARS model, it received the lowest importance score of the accepted predictors. As such, we can conclude that `MARS`'s ability to determine the best predictors is quite strong.
+
+# Exercise 7.5
+## Description
+
+Exercise 6.3 describes data fora chemical manufacturing process. Use the same data imputation, data splitting, and pre-processing steps as before and train several non-linear regression models. 
+
+## Part (a) 
+### Description 
+
+Which non-linear regression model gives the optimal re-sampling and test set performance?
+
+### Solution
+
+First, the cell below recreates the dataset used in when solving Exercise 6.3 in HW7: 
+
+```{r}
+set.seed(19)
+
+# pull in data
+data(ChemicalManufacturingProcess)
+
+# impute missing values with the median of each column
+imputation <- ChemicalManufacturingProcess %>%
+  preProcess("medianImpute")
+
+df <- predict(imputation, ChemicalManufacturingProcess)
+
+# split into training and testing data
+train_ratio <- 0.7
+n <- nrow(df)
+n_train <- round(train_ratio * n)
+
+train_ind <- sample(1:n, n_train)
+
+train <- data.frame(df[train_ind,])
+test <- data.frame(df[-train_ind,])
+
+X_train <- select(train, -Yield)
+y_train <- train$Yield
+
+X_test <- select(test, -Yield)
+y_test <- test$Yield
+```
+
+Next, the cell below trains tuned versions of KNN, SVM, and NN regression models and assesses their performance on the testing and training data: 
+
+```{r, warning=FALSE}
+set.seed(seed_num)
+
+r2_vals <- data.frame(matrix(ncol=3))
+colnames(r2_vals) <- c('type', 'model', 'r2')
+
+
+# KNN Model -------------------------------------------------------------------
+knn <- train(X_train, y_train,
+             method = 'knn',
+             preProc = c("center", "scale"),
+             tuneLength = 10)
+
+knn_r2_resampling <- max(knn$results$Rsquared)
+knnPred <- predict(knn, newdata = X_train)
+knn_r2_train <- unname(postResample(pred = knnPred, obs = y_train)[2])
+knnPred <- predict(knn, newdata = X_test)
+knn_r2_test <- unname(postResample(pred = knnPred, obs = y_test)[2])
+
+r2_vals <- rbind(r2_vals,
+                 c('resampling', 'KNN', knn_r2_resampling),
+                 c('training', 'KNN', knn_r2_train),
+                 c('testing', 'KNN', knn_r2_test))
+
+
+# SVM Model -------------------------------------------------------------------
+svm_grid <- expand.grid(
+  sigma = c(0.01, 0.1, 1),    # radial kernel parameter
+  C = c(0.1, 1, 10)           # cost parameter
+)
+
+svm <- train(X_train, y_train,
+             method = 'svmRadial',
+             preProc = c("center", "scale"),
+             tuneGrid = svm_grid,
+             trControl = train_control)
+
+svm_r2_resampling <- max(svm$results$Rsquared, na.rm = TRUE)
+svmPred <- predict(svm, newdata = X_train)
+svm_r2_train <- unname(postResample(pred = svmPred, obs = y_train)[2])
+svmPred <- predict(svm, newdata = X_test)
+svm_r2_test <- unname(postResample(pred = svmPred, obs = y_test)[2])
+
+r2_vals <- rbind(r2_vals,
+                 c('resampling', 'SVM', svm_r2_resampling),
+                 c('training', 'SVM', svm_r2_train),
+                 c('testing', 'SVM', svm_r2_test))
+
+
+# Neural Network Model --------------------------------------------------------
+nnet_grid <- expand.grid(.decay = c(0, 0.01, 0.1, 0.2), # learning rate
+                         .size = c(1:5), # size of hidden layer
+                         .bag = FALSE)
+
+nnet <- train(X_train, y_train,
+              method = 'avNNet',
+              tuneGrid = nnet_grid,
+              trControl = train_control,
+              preProc = c("center", "scale"),
+              linout = TRUE,
+              trace = FALSE,
+              MaxNWts = 10 * (ncol(trainingData$x) + 1) + 10 + 1,
+              max_it = 500)
+
+nnet_r2_resampling <- max(nnet$results$Rsquared, na.rm = TRUE)
+nnetPred <- predict(nnet, newdata = X_train)
+nnet_r2_train <- unname(postResample(pred = nnetPred, obs = y_train)[2])
+nnetPred <- predict(nnet, newdata = X_test)
+nnet_r2_test <- unname(postResample(pred = nnetPred, obs = y_test)[2])
+
+r2_vals <- rbind(r2_vals,
+                 c('resampling', 'NN', nnet_r2_resampling),
+                 c('training', 'NN', nnet_r2_train),
+                 c('testing', 'NN', nnet_r2_test))
+
+# -----------------------------------------------------------------------------
+  
+r2_vals <- na.omit(r2_vals)
+```
+
+The $R^2$ values for all models are stored in the $r2_vals$ dataframe and are plotted below:
+
+```{r}
+
+ggplot(r2_vals, aes(x = model, y = as.numeric(r2), fill = type)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "R2 Values for Training and Testing",
+       x = "Model",
+       y = "R2 Value",
+       fill = "Type") +
+  theme_minimal()
+
+```
+
+Based on the results above, the SVM and NN had the best (and near-equal) performance on the test set, achieving a $R^2$ value close to 0.65. These performance metrics are great deal more impressive than those witnessed when using the linear regression methods, which never achieved $R^2$ values greater than 0.5. Even the simplest non-linear regression model tested (KNN) was able to achieve better results than the best linear regression model.
+
+## Part (b) 
+### Description  
+
+Which predictors are the most important in the optimal nonlinear regression model? Do either the biological or process variables dominate the list? How do the top ten important predictors compare the top ten important predictors from the optimal linear model?
+
+### Solution
+
+The SVM model from part (a) performed best on the testing data, so it will be used to evaluate feature importance. The `varImp` function is used below to determine the top 20 predictors from the tuned SVM model and plots them: 
+
+```{r}
+var_imps <- data.frame(varImp(nnet)$importance)
+var_imps$predictor_name <- rownames(var_imps)
+rownames(var_imps) <- NULL
+
+top_imps <- var_imps %>%
+  arrange(desc(Overall)) %>%
+    slice_head(n = 20)
+
+ggplot(top_imps, aes(x = reorder(predictor_name, -Overall), y = Overall)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +  # Flip axes for better readability
+  labs(
+    title = "Variable Importance",
+    x = "Variables",
+    y = "Importance Score"
+  ) +
+  theme_minimal()
+```
+
+The plot reveals that both manufacturing and biological predictors were among the most important with neither category dominating. This is similar to the results seen when this analysis was completed using linear models. In fact, the top three predictors are the same for the SVM model and the best linear model from HW7 (albeit in slightly different order).
+
+However, if we look at the average feature importance across all predictors in the dataset: 
+
+```{r}
+man_imps <- var_imps %>%
+  filter(startsWith(predictor_name, "Manufacturing"))
+
+bio_imps <- var_imps %>%
+  filter(startsWith(predictor_name, "Biological"))
+
+avg_man_imp <- round(mean(man_imps$Overall), 2)
+avg_bio_imp <- round(mean(bio_imps$Overall), 2)
+
+print1 <- paste("Manufacturing average feature importance:", avg_man_imp)
+print2 <- paste("Biological average feature importance:", avg_bio_imp)
+
+cat(paste(print1, print2, sep='\n'))
+```
+
+it reveals that the biological features have an average importance that is more than twice that of the average manufacturing feature importance. 
+
+## Part (c) 
+### Description
+
+Explore the relationships between the top predictors and the response for the predictors that are unique to the optimal non-linear regression model. Do these plots reveal intuition about the biological or process predictors and their relationship with yield?
+
+### Solution
+
+Similar to what was done in Homework 7, the cell below determines the correlation of the top 20 predictors with yield, and plots them:
+
+```{r}
+top_names <- top_imps$predictor_name
+rs <- c()
+
+i <- 1
+for(column in top_names){
+  r_val <- cor(df[[column]], df[["Yield"]])
+  rs[i] <- r_val
+  i = i + 1
+}
+
+rs <- data.frame(predictor_name = top_names, r_value = rs)
+
+ggplot(rs, aes(x = predictor_name, y = r_value)) +
+  geom_bar(stat = "identity") +
+  labs(
+    title = "Top Predictors Correlation with Yield",
+    x = "Variables",
+    y = "Pearson-r Correlation"
+  ) +
+  coord_flip() +
+  theme_minimal()
+```
+
+Once again, the plot reveals that all of the top biological predictors have a positive correlation with `yield`, meaning that we can conclude that larger values of these predictors result in increased yield. The behavior of the top manufacturing predictors is less clear, with both positive and negative correlations being visible. That being said, these correlations can help paint a picture of how `yield` will be impacted should their value change in any way.
