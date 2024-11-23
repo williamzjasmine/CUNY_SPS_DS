@@ -1,0 +1,352 @@
+---
+title: "Data 624 - HW 4 - Data Preprocessing"
+author: "William Jasmine"
+date: "2024-09-29"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+All exercises can be found in ["Applied Predictive Modelling"](http://appliedpredictivemodeling.com/) written by Max Kuhn and Kjell Johnson.
+
+# Setup
+
+The following packages are required to rerun this `.rmd` file:
+
+```{r setup, error=FALSE, warning=FALSE, message=FALSE}
+seed_num <- 200
+library(tidyverse)
+library(AppliedPredictiveModeling)
+library(corrplot)
+library(mlbench)
+library(e1071)
+library(caret)
+library(fpp3)
+```
+
+
+# Exercise 3.1
+## Description 
+
+The UC Irvine Machine Learning Repository contains a data set related to glass identification. The data consist of 214 glass samples labelled as one of seven class categories. There are nine predictors, including the refractive index and percentage of the eight elements: Na, Mg, Al, Si, K, Ca, Ba, and Fe. The data can be accessed via:
+
+```{r}
+data(Glass)
+str(Glass)
+```
+
+## Part (a)
+### Description
+
+Using visualizations, explore the predictor variables to understand these distributions as well as the relationships between predictors. 
+
+### Solution
+
+First, the cell below separates the data in `Glass` into its predictors (`X`) and target (`y`): 
+
+```{r}
+X <- select(Glass, -Type)
+y <- Glass$Type
+```
+
+The cell below plots histograms of all the predictor variables in order to view their distributions:
+
+```{r}
+plt_data <- X %>%
+  pivot_longer(cols = everything(), names_to = "variable", values_to = "value")
+
+ggplot(plt_data, aes(x = value)) +
+  geom_histogram(fill = 'steel blue', bins=30) +
+  facet_wrap(~variable, scales = "free") +
+  labs(title = "Histograms of All Predictors", x = "Value", y = "Frequency") +
+  theme_minimal()
+```
+
+Next, the above plot is recreated, but this time includes separate distributions for each category of the target variable:
+
+```{r}
+plt_data <- Glass %>%
+  pivot_longer(cols = -Type, names_to = "variable", values_to = "value")
+
+ggplot(plt_data, aes(x = value, fill = Type)) +
+  geom_histogram(position = "identity", alpha = 0.5, bins = 30) +
+  facet_wrap(~variable, scales = "free") +
+  labs(title = "Histograms of All Predictors (Separated by Class)",
+       x = "Value",
+       y = "Frequency") +
+  theme_minimal()
+```
+
+To evaluate the relationships between the predictors themselves, the cell below creates a correlation plot:
+
+```{r}
+cor_matrix <- cor(X)
+
+corrplot(cor_matrix, method = "color", type = "upper", 
+         tl.col = "black", tl.srt = 45, addCoef.col = "black")
+
+```
+
+## Part (b)
+### Description
+
+Do there appear to be any outliers in the data? Are any predictors skewed? 
+
+### Solution 
+
+The plots produced in part (a) reveal a lot about the structure of the `Glass` dataset and how the predictor variables relate to themselves and the target variable, `Type`. The histogram of the predictors reveal that fields Al, Ca, Mg, are the ones that most closely follow a normal distribution while the rest all have some level of skew. This skewness is not equal however amongst the remaining predictors, with fields Fe and Ba being the worst offenders. We can check statistically which of the predictors can be considered normal using a Shapiro-Wilk test:
+
+```{r}
+col_tests <- function(X){
+  # This function takes in a dataframe X as an input and returns the following
+  # for each of its columns:
+  #     - Determines whether or not the data is normal
+  #     - Determines the skewness of the data
+  
+  # initialize empty dataframe for values
+  col_tests <- data.frame(
+    Variable = character(),
+    SW_P_Value = numeric(),
+    Normal = character(),
+    Skewness = numeric(),
+    High_Skew = character()
+  )
+
+  # loop through dataframe columns
+  for (column in names(X)){
+  
+    # perform shapiro wilk test and calculate skewness
+    vals <- as.numeric(na.omit(X[[column]]))
+    p_val <- shapiro.test(vals)$p.value
+    skew <- skewness(vals)
+  
+    # determine if data is normal
+    normal <- FALSE
+    if (p_val > 0.05){
+      normal <- TRUE
+    }
+  
+    # determine if data is highly skewed
+    high_skew <- FALSE
+    if (skew > 2 | skew < -2){
+      high_skew <- TRUE
+    }
+  
+    # append data to col_tests dataframe
+    row_to_add <- data.frame(
+      Variable = column,
+      P_Value = p_val,
+      Normal = normal,
+      Skewness = skew,
+      High_Skew = high_skew
+    )
+    col_tests <- rbind(col_tests, row_to_add)
+  }
+  return(col_tests)
+}
+
+col_tests(X)
+```
+
+Using the Shapiro-Wilk test, it appears as though none of the variables can be considered normal. Despite this, only three predictors were categorized as having high skew. 
+
+The histograms of each predictor also reveal that a number of them likely contain outliers. In particular, the Ba, Fe, and K fields all appear to have values that are far outside the area of the main distribution. We can check for this quantitatively by determining if any of the fields have values that are outside the third or first quartile by one and half times their inter-quartile range (IQF):
+
+```{r}
+
+outlier_test <- function(X){
+  # This function takes in a dataframe X as an input and returns the number of
+  # outliers in each column.
+  
+  # initialize empty dataframe for values
+  outlier_test <- data.frame(
+    Variable = character(),
+    Outliers = numeric(),
+    Outlier_Percentage = numeric()
+  )
+
+# loop through dataframe columns
+  for (column in names(X)){
+  
+    # determine the 1st and 3rd quartiles and the IQR
+    quar_1 <- quantile(X[[column]])[2]
+    quar_3 <- quantile(X[[column]])[4] 
+    iqr_range <- quar_3 - quar_1
+  
+    # check for outliers 
+    outliers <- 0
+    for (val in X[[column]]){
+      min_limit <- quar_1 - (1.5 * iqr_range)
+      max_limit <- quar_3 + (1.5 * iqr_range)
+      if( val < min_limit | val > max_limit){
+        outliers <- outliers + 1
+      }
+    }
+    
+    # determine the fraction of values in the column that are outliers
+    outlier_frac <- round((outliers / nrow(X)) * 100, 2)
+    
+    # append data to outlier_test dataframe                             
+    row_to_add <- data.frame(
+      Variable = column,
+      Outliers = outliers,
+      Outlier_Percentage = outlier_frac
+    )
+    outlier_test <- rbind(outlier_test, row_to_add)
+  }
+  return(outlier_test)
+}
+
+outlier_test(X)
+```
+
+The results above show that only one of the predictors does not contain outliers, with the percentage of outliers in a column reaching as high as 17.75%. 
+
+Looking at the histograms of each predictor separated by class provides insight into which of the predictors might actually be useful when making predictions. For example, the Al, Na, and Si fields exhibit a range of distributions that appear shifted from one another by class. This means that the information they contain could be useful in determining the category that new observations are a part of. 
+
+Lastly, the correlation plot produced above reveals the the predictors do not seem to suffer from a high degree of multicollinearity. Typically, predictor pairs with correlations greater than 0.7 are considered too high, and the only pair of variables that breaks that threshold is RI and Ca.
+
+## Part (c)
+### Descriptions
+
+Are there any relevant transformations of one or more predictors that might improve the classification model?
+
+### Solution
+
+Part (b) emphasized two possible issues present with the predictor variables: the presence of outliers and high skewness. 
+
+Box-Cox transformations can be used to help quell the possible negative effects of skewness by stabilizing the variance and keeping it closer to constant across the entire range of values in a field. Box-Cox transformations can only be performed if all values are positive, which means this transformation needs to come before any centering and scaling that would transform the mean to 0. 
+
+```{r}
+# k ca ba
+BC_K <- BoxCoxTrans(X$K + 0.0001) # need to add a small bit to avoid 0 values
+BC_Ca <- BoxCoxTrans(X$Ca) 
+BC_Ba <- BoxCoxTrans(X$Ba)
+
+X$K <- predict(BC_K, X$K)
+X$Ca <- predict(BC_Ca, X$Ca)
+X$Ba <- predict(BC_Ba, X$Ba)
+```
+
+The output below shows that the Box-Cox transformations resulted in two of the three problematic predictors no longer having high skew. 
+
+```{r}
+col_tests(X)
+```
+
+To help inhibit the influence of outliers, a spatial sign transformation can be applied. Spatial sign transformations transform each data point to a unit vector, which scales their magnitudes down to 1 effectively neutralizing their extreme values. Because all but 1 predictor contained outliers, we can apply this transformation to the entire dataset. However, the data also needs to be centered and scaled (transformed so that the mean $\mu$ and standard deviation $\sigma$ of each column are 0 and 1, respectively) before doing so. To perform the scaling and spatial sign transformation all in one pipeline process, we can invoke the `preProcess` function (from the `caret` library):
+
+```{r}
+pipeline <- preProcess(X, method = c("center", "scale", "spatialSign"))
+X <- predict(pipeline, X)
+```
+
+The output below reveals that this transformation significantly reduced the number of outliers in the dataset: 
+
+```{r}
+outlier_test(X)
+```
+
+The combination of these transformations should result in a dataset with a higher degree of predictive power. 
+
+# Exercise 3.2
+## Description 
+
+The soybean data can also be found at the UC Irvine Machine Learning Repository. Data were collected to predict disease in 683 soybeans. The 35 predictors are mostly categorical and include information on the environmental conditions (e.g. temperature, precipitation) and plant conditions (e.g. left spots, mold growth). The outcome labels consist of 19 distinct classes. The data can be loaded via:
+
+```{r}
+data(Soybean)
+```
+
+## Part (a)
+### Description 
+
+Investigate the frequency distributions for the categorical predictors. Are any of the distributions degenerate in the ways discussed earlier in this chapter?
+
+### Solution 
+
+The cell below uses the `col_tests` function created earlier in order to test the predictor columns of the `Soybean` dataset: 
+
+```{r}
+X <- select(Soybean, -Class)
+y <- Soybean$Class
+
+col_tests(X) %>% arrange(by_group = desc(Skewness))
+```
+
+We see that 11 of the 35 rows exhibit a high degree of skewness, and none of the predictor distributions are considered normal according to a Shapiro-Wilk test. 
+
+## Part (b)
+### Description 
+
+Roughly 18% of the data are missing. Are there particular predictors that are more likely to be missing? Is the pattern of missing data related to the classes?
+
+### Solution 
+
+The following outputs the percentage of values in each field that are missing: 
+```{r}
+missing_data_cols <- data.frame(
+  Column = names(X),
+  MissingValues = 
+    round(sort(colSums(is.na(X)), decreasing = TRUE) / nrow(X), 4) * 100
+)
+
+rownames(missing_data_cols) <- NULL
+
+ggplot(missing_data_cols, 
+       aes(x = reorder(Column, MissingValues), y = MissingValues)) +
+  geom_bar(stat = "identity", fill = "steel blue") +
+  labs(
+    title = "% of Values Missing Per Column", 
+    x = "Predictor Name", 
+    y = "% Missing Values") +
+  coord_flip() +
+  theme_minimal()
+```
+
+Based on the above plot, there are clearly some predictors with a much higher degree of missing data compared to others. It also looks as though predictors that might have come from the same source (i.e. weather based predictors, leaf measurements, mycology based predictors) all have constant levels of missing information. 
+
+Next, the cell below evaluates missing values by class:
+
+```{r}
+missing_data_class <- Soybean %>%
+  group_by(Class) %>%
+  summarise(MissingValues = sum(is.na(across(everything()))),
+            TotalValues = n())
+
+missing_data_class$TotalValues <- missing_data_class$TotalValues * ncol(X)
+missing_data_class$FracMissing <- missing_data_class$MissingValues / missing_data_class$TotalValues
+
+
+ggplot(missing_data_class, 
+       aes(x = reorder(Class, FracMissing), y = FracMissing)) +
+  geom_bar(stat = "identity", fill='steel blue') +
+  labs(title = "Missing Values by Class", x = "Class", y = "Number of Missing Values") +
+  coord_flip() 
+```
+
+The plot above is much more enlightening as to the cause of the missing data. It appears as though all missing data comes from observations of five different class, each seeming to represent some kind of injury or disease (i.e. cyst, rot, blight, etc.). As such, it might have been impossible to take measurements of these predictors while the soybean plants are affected with any of these conditions.
+
+## Part (c)
+### Description
+
+Develop a strategy for handling missing data, either by eliminating predictors or imputation.
+
+### Solution 
+
+Since all of the predictors have some level of missing data, it would likely be incorrect to remove any of them. As such, a data imputation strategy is necessary. Because each of the predictor fields are categorical, a mode imputation strategy will likely be effective. More specifically, because the missing values seem to be class driven, we can implement mode imputation by class in which missing values in each class are imputed with the most frequent value within that class: 
+
+```{r}
+# develop function to calc mode that can be used by mutate later on
+Mode <- function(x) {
+  ux <- unique(na.omit(x))
+  ux[which.max(tabulate(match(x, ux)))]
+}
+
+# mode imputation by class
+imputed <- Soybean %>%
+  group_by(Class) %>%
+  mutate(across(everything(), ~ ifelse(is.na(.), Mode(.), .)))
+```
+
+The cell above shows how this imputation strategy can be implemented in R. 
