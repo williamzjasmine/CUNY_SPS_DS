@@ -1,0 +1,377 @@
+---
+title: "Data 624 - Project 1 - Forecasting"
+author: "William Jasmine"
+date: "2024-10-28"
+output:
+  html_document: 
+    toc: true
+    toc_float: true
+    toc_depth: 3
+  pdf_document: default
+---
+
+# Setup
+
+The following cell includes all the packages necessary to run this `.rmd` file.
+
+```{r, warning=FALSE, message=FALSE}
+knitr::opts_chunk$set(eval = TRUE, message = FALSE, warning = FALSE)
+library(tidyverse)
+library(readxl)
+library(fpp3)
+library(patchwork)
+library(tseries)
+library(urca)
+```
+
+
+# Part A
+
+## Description
+
+Forecast how much cash is taken out of 4 different ATM machines for May 2010.  The data is given in a single file `ATM624Data.xlsx` and the the forecast variable `Cash` is provided in hundreds of dollars. Explain and demonstrate your process, techniques used and not used, and your actual forecast. Please include a written report on your findings, visuals, discussion and your R code. 
+
+##  Importing the Data
+
+```{r}
+partA <- read_excel("data/ATM624Data.xlsx", sheet=1)
+head(partA)
+```
+
+The data consists of 3 columns:
+
+* `DATE`: A numerical value representing the date of the observation. 
+* `ATM`: Which ATM the observation corresponds to.
+* `Cash`: The daily amount that was withdrawn from the ATM.     
+
+```{r}
+nrow(partA)
+```
+
+In addition, the dataset contains 1,474 observations. 
+
+## Data Cleaning
+### Dealing with NA Data
+
+Before embarking on any forecasting or additional data cleaning steps, the cell below checks for missing data:
+
+```{r}
+missing <- !complete.cases(partA)
+partA[missing, ]
+```
+
+The above output reveals that there are 19 rows that contain at least one missing value (that being said, thankfully, there are no missing dates). The 14 rows that contain no `ATM` value are useless and therefore removed below:
+
+```{r}
+partA <- partA %>%
+  filter(!is.na(ATM))
+nrow(partA)
+```
+
+The output above confirms that those 14 rows have now been removed. 
+
+The remaining observations only contain missing values in the `Cash` field, and their effect can be visualized in the plot below:
+
+```{r}
+partA %>%
+  filter(ATM == 'ATM1' | ATM == 'ATM2') %>%
+    filter(DATE >= 39975 & DATE <= 39990) %>%
+      ggplot(aes(x = DATE, y = Cash, color = ATM)) + 
+      geom_line() +
+      labs(
+        x = "Date",
+        y = 'Amount (100s of $)',
+        title = 'Identifying the Missing Values'
+      )
+```
+
+The above shows the two missing values from both ATM1 and ATM2, and makes it clear that the surrounding days all had non-zero withdrawal amounts. While these ATMS might have been closed on these days, it makes sense for the sake of future forecasting to the missing data. The cell below creates a uses a function `impute_recent_value` to fill in the empty values with the previous value of the time series (a forward fill methodology):
+
+
+```{r}
+impute_recent_value <- function(vec) {
+  for (i in seq_along(vec)) {
+    if (is.na(vec[i]) && i > 1) {
+      vec[i] <- vec[i - 1]  # Replace NA with the most recent non-NA value
+    }
+  }
+  return(vec)
+}
+
+partA$Cash <- impute_recent_value(partA$Cash)
+
+partA %>%
+  filter(ATM == 'ATM1' | ATM == 'ATM2') %>%
+    filter(DATE >= 39975 & DATE <= 39990) %>%
+      ggplot(aes(x = DATE, y = Cash, color = ATM)) + 
+      geom_line() +
+      labs(
+        x = "Date",
+        y = 'Amount (100s of $)',
+        title = 'Identifying the Missing Values'
+      )
+
+```
+
+The plot above confirms these gaps are now filled, and the output below proves that `partA` no longer contains any null values:
+
+```{r}
+any(is.na(partA))
+```
+
+### Reformatting Dates
+
+The dates in the `partA` dataframe currently exist in an excel format in which the numeric values in the `DATE` column represent the number of days after January 1st, 1900. The cell below converts these values to actual dates:
+
+```{r}
+partA$DATE <- as.Date(partA$DATE, origin="1899-12-30")
+head(partA)
+```
+
+It is clear from the above output that the first date for which we have data is May 1st, 2009. Next, we can convert the `partA` dataframe to a `tsibble` object, which enables easier time series analysis:
+
+```{r}
+partA <- as_tsibble(partA, index=DATE, key=ATM)
+glimpse(partA)
+```
+
+
+The output above shows that `partA` is a `tsibble` that represents a time series with daily intervals containing 4 different keys. In this case, the 4 different keys represent 4 different ATMs:
+
+```{r}
+unique(partA$ATM)
+```
+
+
+Finally, we can plot the data in `partA` to get a better understanding of its structure:
+
+```{r}
+partA %>%
+  autoplot(Cash) +
+  labs(
+    title = 'Daily ATM Withdrawl Amounts',
+    y = 'Amount (100s of $)',
+    x = 'Date'
+  )
+```
+
+### Removing Outliers
+
+The plot from the previous subsection reveals a possible outlier in the data:
+
+```{r}
+partA[which.max(partA$Cash), ]
+```
+
+The above tells us that on 2010-02-09, $1,091,976 was withdrawn from ATM4. A quick Google search reveals that this amount is much larger that what is typically held inside an ATM. Based off the surrounding data, a data entry error likely resulted in this value being is likely 10 times larger than it should have been (the decimal place misplaced by one digit). As such, the cell below fixes this error and re-plots the data:
+
+```{r}
+
+partA[which.max(partA$Cash), ]$Cash <- 
+  partA[which.max(partA$Cash), ]$Cash / 10
+partA %>%
+  autoplot(Cash) +
+  labs(
+    title = 'Daily ATM Withdrawal Amounts (Outlier Removed)',
+    y = 'Amount (100s of $)',
+    x = 'Date'
+  )
+```
+
+### Removing ATM3 
+
+With the outlier no longer obfuscating the plot, another potential issue is made clear: ATM3 appears have very low withdrawal amounts across the entire time period. 
+
+```{r}
+atm3 <- partA %>%
+  filter(ATM == 'ATM3')
+
+table(atm3$Cash)
+```
+
+In fact, for 362 out of the 365 days included, the withdrawal amount from ATM3 is 0:
+
+```{r}
+tail(atm3)
+```
+
+Furthermore, the output above reveals that it is only the last 3 values that are non-zero. Whether or not this was due to an error or the fact that ATM3 was not open until 2010-04-28, the lack of observations means that any forecast made will likely be unreliable. As such, the data from ATM3 is removed in the cell below:
+
+```{r}
+partA <- partA %>%
+  filter(ATM != 'ATM3')
+```
+
+## Exploratory Analysis
+### STL Decomposition
+
+The cell below breaks performs STL decomposition on the time series for each ATM to evaluate both their seasonality and trend:
+
+```{r}
+atm1 <- partA %>%
+  filter(ATM == "ATM1")
+
+atm2 <- partA %>%
+  filter(ATM == "ATM2")
+
+atm4 <- partA %>%
+  filter(ATM == "ATM4")
+
+atm1_stl <- atm1 %>% 
+  model(STL(Cash ~ season(window = "periodic"))) %>% 
+    components()
+atm2_stl <- atm2 %>% 
+  model(STL(Cash ~ season(window = "periodic"))) %>%
+    components()
+atm4_stl <- atm4 %>% 
+  model(STL(Cash ~ season(window = "periodic"))) %>%
+    components()
+
+plot1 <- autoplot(atm1_stl)
+plot2 <- autoplot(atm2_stl)
+plot3 <- autoplot(atm4_stl)
+
+(plot1 + plot2 + plot3)
+
+```
+
+### Seasonality 
+
+The plots do indicate that the time series of each ATM exhibit weekly seasonality. We can seek further evidence of this by creating autocorrelation plots for each time series:
+
+```{r}
+plot1 <- atm1 %>%
+  ACF(Cash) %>%
+    autoplot()
+
+plot2 <- atm2 %>%
+  ACF(Cash) %>%
+    autoplot()
+
+plot3 <- atm4 %>%
+  ACF(Cash) %>%
+    autoplot()
+
+(plot1 + plot2 + plot3)
+```
+
+We see spikes in the autocorrelation plots every 7th day indicating that the data correlates with itself when applying a 7 day (weekly) lag. 
+
+### Trend 
+When evaluating trend from the STL plots, each ATM does not appear to exhibit any clear upwards or downwards growth, with the overall values staying pretty consistent over the course of the year. We can check this statistically however by performing both an ADF and KPSS test:
+
+```{r}
+kpss_tests <- partA %>%
+  features(Cash, unitroot_kpss) %>%
+    select(-kpss_stat)
+
+adf_test_pval <- function(series) {
+  test <- ur.df(series, type = "drift", selectlags = "AIC") 
+  pval <- summary(test)@testreg$coefficients[2, 4]
+  return(pval)
+}
+
+adf_atm1 <- adf_test_pval(atm1$Cash)
+adf_atm2 <- adf_test_pval(atm2$Cash)
+adf_atm4 <- adf_test_pval(atm4$Cash)
+
+adfs <- c(adf_atm1, adf_atm2, adf_atm4)
+atm_names <- c("ATM1", "ATM2", "ATM4")
+
+adf_tests <- data.frame(
+  ATM = atm_names,
+  adf_pvalue = adfs
+)
+
+kpss_tests %>%
+  left_join(adf_tests)
+```
+
+The KPSS and ADF tests both check for stationarity (i.e. whether or not the time series exhibits a trend). $p$-values $<0.05$ when performing the ADF test indicate time series is stationary, while the opposite is true when performing the KPSS test (the series is considered stationary if $p>=0.05$). Looking at the results above, all but one of the tests results indicate non-stationarity: the result of the KPSS test using the ATM2 time series. This indicates that this series might be trend-stationary, in which a deterministic trend may be an inherent part of the series. 
+
+### Summary
+
+The results of the analyses performed in this section are summarized below:
+
+* <b>ATM1 and ATM4:</b> Exhibits weekly seasonality and stationarity (no trend). An SAMIRA model would likely provide the best results when forecasting this data. 
+
+* <b>ATM2:</b> Exhibits weekly seasonality and non-stationarity (apparent trend). AMIRA models expect stationarity, so an Error-Trend-Seasonality (ETS) model would likely provide the best results when forecasting this data. 
+
+## Forecasting
+
+The cell below splits the data into a training and testing set in preparation for forecasting. The last 3 out of 12 months (2010-02-01 through 2010-04-31) are designated as the test set that will be used to evaluate model performance. 
+```{r}
+train_data <- partA %>% filter(DATE < "2010-02-01")
+test_data <- partA %>% filter(DATE >= "2010-02-01")
+```
+
+Five different models are defined below:
+
+1. `naive`: A Naive model that will simply duplicate the last value of the time series for all future predictions. 
+2. `snaive`: A seasonal Naive model that incorporates a seasonality factor to the underlying Naive model.
+3. `ets_trend`: A Error-Trend-Seasonality model that incorporates additive seasonality, trend, and error. 
+4. `ETS_no_trend`: A Error-Trend-Seasonality model that incorporates additive seasonality and error with no trend.
+5. `samira`: An AMIRA model that incorporates weekly seasonality.
+
+
+```{r}
+# Define models
+models <- train_data %>%
+  model(
+    #naive = NAIVE(Cash),
+    #snaive = SNAIVE(Cash ~ lag("week")),
+    ets_trend = ETS(Cash ~ error("A") + trend("A") + season("A")),
+    ets_no_trend = ETS(Cash ~ error("A") + trend("N") + season("A")),
+    samira = ARIMA(Cash ~ PDQ(0,0,0) + season("W"))
+  )
+```
+
+The cell below creates 4 months worth of forecasts for each model (3 months to cover the scope of the test data, along with an additional month to forecast values in May of 2010).
+
+```{r}
+forecasts <- models %>%
+  forecast(h = "4 months")
+```
+
+The accuracy metrics for each model are calculated below using the testing set:
+
+```{r}
+# Evaluate accuracy
+accuracy_metrics <- forecasts %>%
+  accuracy(test_data)
+
+# View metrics
+accuracy_metrics
+```
+
+```{r}
+best_scores <- accuracy_metrics %>%
+  group_by(by = ATM) %>%
+    summarise(
+      min_rmse = min(RMSE)
+    )
+
+best_models <-
+  accuracy_metrics[accuracy_metrics$RMSE %in% best_scores$min_rmse, ] %>%
+    select(ATM, .model) %>%
+      arrange(by_group = ATM)
+
+best_models
+```
+
+
+```{r}
+forecasts %>%
+  filter(ATM == 'ATM1') %>%
+    autoplot()
+```
+
+```{r}
+best_model <- accuracy_metrics %>%
+  arrange(RMSE) %>%
+  slice(1)
+print(best_model)
+
+```
+
+# Part B

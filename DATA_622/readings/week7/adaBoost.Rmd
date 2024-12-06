@@ -1,0 +1,105 @@
+---
+title: "Data 622 - Week 7 Discussion - ADA Boosting"
+author: "William Jasmine"
+date: "2024-03-19"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+# Libraries and setup
+
+Libraries used for the analysis shown here.
+
+```{r setup, results=FALSE, message=FALSE}
+library(tidyverse)
+library(caret)
+library(mlbench)
+library(ggplot2)
+library(data.table)
+library(randomForest)
+library(JOUSBoost)
+library(ada)
+seed_num <- 42
+```
+
+
+# Example - Random Forest vs. ADABoost
+
+First the cell below imports the Breast cancer dataset from the `mlbench`  package, and does a bit of data cleaning to remove `NaN` rows and a predictively useless `Id` column. 
+
+```{r}
+data("BreastCancer")
+df <- BreastCancer
+df <- na.omit(df)
+df <- select(df, -Id)
+summary(df)
+```
+
+The two classes in this dataset tell us whether or not a tumor is benign or malignant, and comprises an additional 9 predictor variables. 
+
+```{r}
+#df <- df  %>% mutate(
+#  Class_new = case_when(
+#    Class == 'benign' ~ -1,
+#    TRUE ~ 1
+#  )
+#)
+#df <- dplyr::select(df, -Class)
+#df$Class <- df$Class_new
+#df <- dplyr::select(df, -Class_new)
+df$Class <- as.factor(df$Class)
+table(df$Class)
+```
+
+The cell below splits the data into testing and training datasets using and 75/25 split.
+
+```{r}
+set.seed(seed_num)
+ind <- sample(2, nrow(df), replace = TRUE, prob = c(0.75, 0.25))
+train <- df[ind==1,]
+test <- df[ind==2,]
+x_train <- dplyr::select(train, -Class)
+y_train <- train$Class
+x_test <- dplyr::select(test, -Class)
+y_test <- test$Class
+```
+
+The cell below trains an "out of the box" random forest classifier using the training data. 
+
+```{r}
+rf <- randomForest(Class~., data=train) 
+print(rf)
+```
+
+Next, we use the random forest model to make predictions on the testing dataset and see how well it performed: 
+
+```{r}
+p_rf <- predict(rf, x_test)
+confusionMatrix(p_rf, y_test)
+```
+
+Since this is a case in which we really want to limit false negatives (cases in which a malignant tumor is diagnosed as benign), we will focus on sensitivity as the metric of choice. The results above show that the random forest model performed exceedingly well: >96% of all malignant tumors were indeed identified as such by the model. 
+
+
+The cell below implements an ADABoosting model using the same training data: 
+
+```{r}
+ada <- ada(Class~., data=train) 
+summary(ada)
+```
+
+
+We can now use the ADABoosting model to make predictions on the test set: 
+
+```{r}
+p_ada <- predict(ada, x_test)
+confusionMatrix(p_ada, y_test)
+```
+
+In this case, we see that the ADABoost model did indeed result in a higher sensitivity, meaning better performance for the task at hand. It is worth noting however, that the balanced accuracy slightly decreased.
+
+
+# Conclusions 
+
+In general, ADABoosting can be used to improve the performance of binary classification models, which exactly the behavior witnessed here. That being said, better performance might not always be exhibited for different datasets.  As such, proper testing is necessary to ensure when ADABoosting is an appropriate choice. 
