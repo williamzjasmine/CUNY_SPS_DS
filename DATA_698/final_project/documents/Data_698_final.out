@@ -1,0 +1,33 @@
+\BOOKMARK [1][-]{section.1}{Introduction}{}% 1
+\BOOKMARK [1][-]{section.2}{Literature Review}{}% 2
+\BOOKMARK [1][-]{section.3}{Hypothesis}{}% 3
+\BOOKMARK [1][-]{section.4}{Data}{}% 4
+\BOOKMARK [2][-]{subsection.4.1}{Data Source}{section.4}% 5
+\BOOKMARK [2][-]{subsection.4.2}{Data Cleaning}{section.4}% 6
+\BOOKMARK [1][-]{section.5}{Methods}{}% 7
+\BOOKMARK [2][-]{subsection.5.1}{Data Sampling}{section.5}% 8
+\BOOKMARK [2][-]{subsection.5.2}{Data Preprocessing}{section.5}% 9
+\BOOKMARK [3][-]{subsubsection.5.2.1}{Outliers}{subsection.5.2}% 10
+\BOOKMARK [3][-]{subsubsection.5.2.2}{Normality}{subsection.5.2}% 11
+\BOOKMARK [3][-]{subsubsection.5.2.3}{Multicollinearity}{subsection.5.2}% 12
+\BOOKMARK [3][-]{subsubsection.5.2.4}{Scaling}{subsection.5.2}% 13
+\BOOKMARK [3][-]{subsubsection.5.2.5}{Full Transformation Pipeline}{subsection.5.2}% 14
+\BOOKMARK [2][-]{subsection.5.3}{Exploratory Data Analysis}{section.5}% 15
+\BOOKMARK [2][-]{subsection.5.4}{Support Vector Machines \(SVM\)}{section.5}% 16
+\BOOKMARK [2][-]{subsection.5.5}{Random Forests \(RF\)}{section.5}% 17
+\BOOKMARK [2][-]{subsection.5.6}{Quantum Computer Simulation}{section.5}% 18
+\BOOKMARK [3][-]{subsubsection.5.6.1}{Additional Sampling}{subsection.5.6}% 19
+\BOOKMARK [3][-]{subsubsection.5.6.2}{ZZFeatureMap}{subsection.5.6}% 20
+\BOOKMARK [3][-]{subsubsection.5.6.3}{StateVectorSampler}{subsection.5.6}% 21
+\BOOKMARK [3][-]{subsubsection.5.6.4}{FidelityQuantumKernel}{subsection.5.6}% 22
+\BOOKMARK [2][-]{subsection.5.7}{Quantum Support Vector Machines \(QSVM\)}{section.5}% 23
+\BOOKMARK [2][-]{subsection.5.8}{Quantum Random Forests \(QRF\)}{section.5}% 24
+\BOOKMARK [1][-]{section.6}{Results}{}% 25
+\BOOKMARK [2][-]{subsection.6.1}{Support Vector Machines}{section.6}% 26
+\BOOKMARK [2][-]{subsection.6.2}{Random Forest}{section.6}% 27
+\BOOKMARK [2][-]{subsection.6.3}{Quantum Kernel Matrix Build Time}{section.6}% 28
+\BOOKMARK [2][-]{subsection.6.4}{Quantum Support Vector Machines}{section.6}% 29
+\BOOKMARK [2][-]{subsection.6.5}{Quantum Random Forests}{section.6}% 30
+\BOOKMARK [1][-]{section.7}{Discussion}{}% 31
+\BOOKMARK [1][-]{section.8}{Conclusion/Next Steps}{}% 32
+\BOOKMARK [1][-]{section.9}{References}{}% 33
